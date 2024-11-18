@@ -11,16 +11,23 @@ globals [
   wolf-reproduce       ; probability that wolves will reproduce at each time step
   grass-regrowth-time  ; number of ticks before eaten grass regrows.
   max-sheep            ; don't let the sheep population grow too large
+  min-distance-between-wolves  ; Distance minimale entre deux chasseurs
+  is-music-playing ; variable pour suivre si la musique de fond joue
 ]
 
 breed [ sheep a-sheep ]
 breed [ wolves wolf ]
+undirected-link-breed [ connections connection ]
+
 
 turtles-own [ energy stride-length ]
 patches-own [ countdown ]  ; patches countdown until they regrow
 
 to setup
   clear-all
+
+  set is-music-playing false  ; initialise l'état de la musique
+  play-background-sound       ; démarre la musique de fond
 
   ; on NetLogo Web, limit the number of sheep to a lower amount
   ifelse netlogo-web? [ set max-sheep 10000 ] [ set max-sheep 30000 ]
@@ -34,6 +41,7 @@ to setup
   set sheep-reproduce 5
   set wolf-reproduce 6
   set grass-regrowth-time 138
+  set min-distance-between-wolves 2  ; Par exemple, une distance de 2 unités
 
   ; setup the grass
   ask patches [
@@ -42,94 +50,64 @@ to setup
     ifelse random 2 = 0 [ set pcolor brown ] [ set pcolor green ]
   ]
 
-  set-default-shape sheep "sheep"
+  ; Importation des images choisies pour le chasseur et le sanglier
+  ; Vérifiez si NetLogo peut utiliser les images personnalisées.
+  ifelse file-exists? "hunter.png" and file-exists? "boar.png" [
+    import-drawing "./img/hunter.png"
+    set-default-shape wolves "hunter"
+
+    import-drawing "./img/boar.png"
+    set-default-shape sheep "boar"
+  ] [
+    ; Si les images ne sont pas disponibles, utilisez les formes par défaut.
+    set-default-shape wolves "wolf"
+    set-default-shape sheep "sheep"
+  ]
+
   create-sheep initial-number-sheep [ ; create the sheep, then initialize their variables
     set color white
     set stride-length initial-sheep-stride
     set size max-stride ; easier to see
-    set energy random max-energy
     setxy random-xcor random-ycor
   ]
 
-  set-default-shape wolves "wolf"
+
   create-wolves initial-number-wolves [  ; create the wolves, then initialize their variables
     set color black
     set stride-length initial-wolf-stride
     set size max-stride  ; easier to see
-    set energy random max-energy
     setxy random-xcor random-ycor
   ]
+
   reset-ticks
 end
 
-to go
-  ; stop the model if there are no wolves and no sheep
-  if not any? turtles [ stop ]
 
-  ; stop the model if there are no wolves and the number of sheep gets very large
+to go
+  if not is-music-playing [ play-background-sound ]
+
+  if not any? turtles [ stop ]
   if not any? wolves and count sheep > max-sheep [ user-message "The sheep have inherited the earth" stop ]
 
   ask sheep [
     move
-    ; sheep always loose 0.5 units of energy each tick
-    set energy energy - 0.5
-    ; if larger strides use more energy
-    ; also deduct the energy for the distance moved
     if stride-length-penalty? [ set energy energy - stride-length ]
-    eat-grass
     maybe-die-sheep
-    reproduce-sheep
+    reproduce-on-collision-sheep
   ]
   ask wolves [
     move
-    ; wolves always loose 0.5 units of energy each tick
-    set energy energy - 0.5
-    ; if larger strides use more energy
-    ; also deduct the energy for the distance moved
+    maintain-spacing-wolves
+    reproduce-on-collision-wolves
     if stride-length-penalty? [ set energy energy - stride-length ]
-    catch-sheep
     maybe-die-wolf
-    reproduce-wolves
   ]
-  ask patches [ grow-grass ]
+
+
   tick
 end
 
-to move  ; turtle procedure
-  rt random-float 50
-  lt random-float 50
-  fd stride-length
-end
 
-to eat-grass  ; sheep procedure
-  ; sheep eat grass, turn the patch brown
-  if pcolor = green [
-    set pcolor brown
-    set energy energy + sheep-gain-from-food  ; sheep gain energy by eating
-    if energy > max-energy [ set energy max-energy ]
-  ]
-end
-
-to reproduce-sheep  ; sheep procedure
-  reproduce sheep-reproduce sheep-stride-length-drift
-end
-
-to reproduce-wolves  ; wolf procedure
-  reproduce wolf-reproduce wolf-stride-length-drift
-end
-
-to reproduce [ reproduction-chance drift ] ; turtle procedure
-  ; throw "dice" to see if you will reproduce
-  if random-float 100 < reproduction-chance and energy > min-energy [
-    set energy (energy / 2 )  ; divide energy between parent and offspring
-    hatch 1 [
-      rt random-float 360
-      fd 1
-      ; mutate the stride length based on the drift for this breed
-      set stride-length mutated-stride-length drift
-    ]
-  ]
-end
 
 to-report mutated-stride-length [ drift ] ; turtle reporter
   let l stride-length + random-float drift - random-float drift
@@ -141,39 +119,130 @@ to-report mutated-stride-length [ drift ] ; turtle reporter
   report l
 end
 
-to catch-sheep  ; wolf procedure
-  let prey one-of sheep-here
-  if prey != nobody [
-    ask prey [ die ]
-    set energy energy + wolf-gain-from-food
-    if energy > max-energy [set energy max-energy]
+
+;
+;
+;
+;          Partie qui fonctionnent comme on le veux ci dessous
+;
+;
+;
+
+
+
+
+
+
+
+to maintain-spacing-wolves
+  ask wolves [
+    let close-wolves other wolves in-radius min-distance-between-wolves
+    if any? close-wolves [
+      ; Si un autre chasseur est trop proche, bouger pour s'éloigner
+      rt random 180
+      fd 1
+    ]
   ]
 end
+
+
+
+
+
+
+
+
+
+to move
+  let close-wolves other wolves in-radius min-distance-between-wolves
+  if any? close-wolves [
+    ; Si un autre chasseur est trop proche, s'éloigner
+    rt random 180  ; Tourne dans une direction aléatoire
+  ]
+  fd stride-length  ; Continue le déplacement
+end
+
+
+
+; reproduction des chasseurs si ils se touchent
+to reproduce-on-collision-wolves
+  let mate one-of other wolves-here  ; Cherche un autre chasseur dans la même case
+  if mate != nobody [
+    if energy > min-energy [
+      set energy energy / 2  ; Divise l'énergie avec le parent
+      ask mate [ set energy energy / 2 ]  ; Divise aussi l'énergie du partenaire
+      hatch 1 [
+        set color black
+        set stride-length mutated-stride-length wolf-stride-length-drift
+        set energy min-energy  ; Donne l'énergie minimale au nouveau-né
+        rt random-float 360
+        fd 1
+      ]
+    ]
+  ]
+end
+
+
+; reproduction des sangliers si ils se touchent
+to reproduce-on-collision-sheep
+  let mate one-of other sheep-here  ; Cherche un autre sanglier dans la même case
+  if mate != nobody [
+    if energy > min-energy [
+      set energy energy / 2  ; Divise l'énergie avec le parent
+      ask mate [ set energy energy / 2 ]  ; Divise aussi l'énergie du partenaire
+      hatch 1 [
+        set color white
+        set stride-length mutated-stride-length sheep-stride-length-drift
+        set energy min-energy  ; Donne l'énergie minimale au nouveau-né
+        rt random-float 360
+        fd 1
+      ]
+    ]
+  ]
+end
+
 
 to maybe-die-sheep ; turtle procedure
   ; when energy dips below zero, die
-  if energy < 0 [ die]
-end
-
-to maybe-die-wolf ; turtle procedure
-  ; when energy dips below zero, die
-  if energy < 0 [ die ]
-end
-
-to grow-grass  ; patch procedure
-  ; countdown on brown patches, if reach 0, grow some grass
-  if pcolor = brown [
-    ifelse countdown <= 0 [
-      set pcolor green
-      set countdown grass-regrowth-time
-    ] [ set countdown countdown - 1 ]
+  if energy < 0 [
+    play-sound-boar  ; Joue le son avant que le sanglier ne meure
+    die
   ]
 end
 
-to sound ;
-  ;sound:play-sound "Le sanglier.mp3"
-  sound:play-sound "Le-sanglier.wav"
+
+to maybe-die-wolf ; turtle procedure
+  ; when energy dips below zero, die
+  if energy < 0 [
+    play-sound-hunter
+    die
+  ]
 end
+
+to play-sound-boar ;
+  ;sound:play-sound "Le sanglier.mp3"
+  sound:play-sound "./sound/Le-sanglier.wav"
+end
+
+to play-sound-hunter
+  sound:play-sound "./sound/hunter-sound.wav"
+end
+
+to play-background-sound
+  if not is-music-playing [
+    sound:play-sound "./sound/la-balade-au-fusil.wav"
+    set is-music-playing true
+  ]
+end
+
+
+to stop-background-sound
+  sound:stop-sound
+  set is-music-playing false
+end
+
+
+
 
 
 ; Copyright 2006 Uri Wilensky.
@@ -367,7 +436,7 @@ initial-wolf-stride
 initial-wolf-stride
 0
 1
-1.0
+0.2
 0.1
 1
 NIL
@@ -416,7 +485,7 @@ wolf-stride-length-drift
 wolf-stride-length-drift
 0
 1
-0.24
+0.23
 0.01
 1
 NIL
@@ -465,7 +534,7 @@ SWITCH
 207
 stride-length-penalty?
 stride-length-penalty?
-0
+1
 1
 -1000
 
@@ -490,23 +559,6 @@ mean [stride-length] of sheep
 2
 1
 11
-
-BUTTON
-821
-27
-892
-60
-NIL
-sound
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
 
 @#$#@#$#@
 ## WHAT IS IT?
