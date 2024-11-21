@@ -1,9 +1,12 @@
 globals [ max-sheep ]
 
 breed [ sheep a-sheep ]
+breed [ promeneurs a-promeneur]
 
 turtles-own [ energy ]
-patches-own [ countdown ]
+patches-own [ countdown visit-count]
+
+
 
 ; Déclaration du switch dans l'interface utilisateur :
 ; Créez un switch appelé `show-energy` qui peut être activé ou désactivé.
@@ -11,11 +14,13 @@ patches-own [ countdown ]
 to setup
   clear-all
   ifelse netlogo-web? [ set max-sheep 10000 ] [ set max-sheep 30000 ]
+  show shapes
 
   ; Initialisation des patches (fond vert)
   ask patches [
     set pcolor green
     set countdown random 50
+    set visit-count 0
   ]
 
   create-path  ; Créer le chemin
@@ -35,15 +40,69 @@ to setup
     ]
   ]
 
+  create-promeneurs initial-number-promeneurs [
+    set shape "person"
+    set color red
+    set size 2
+    set energy random 4000 + 1000
+    let target-patch one-of patches with [pcolor = brown]
+    if target-patch != nobody [
+      move-to target-patch
+    ]
+    ifelse show-energy = true[
+      set label (round (energy * 100) / 100)
+    ]
+    [
+     set label ""
+    ]
+  ]
+
   reset-ticks
 end
 
 to go
-  if not any? sheep [ stop ]
+  if not any? turtles [ stop ]
+
+  ; Vérifier si un nouveau promeneur doit être ajouté
+  if ticks mod 500 = 0 [
+    ifelse random 1000 = 0[
+      create-promeneurs 100 [
+      set shape "person"
+      set color red
+      set size 2
+      set energy random 4000 + 1000
+      let target-patch one-of patches with [pcolor = brown]
+      if target-patch != nobody [
+        move-to target-patch
+      ]
+      ifelse show-energy = true [
+        set label (round (energy * 100) / 100)
+      ] [
+        set label ""
+      ]
+    ]
+    ]
+    [
+    create-promeneurs 1 [
+      set shape "person"
+      set color red
+      set size 2
+      set energy random 4000 + 1000
+      let target-patch one-of patches with [pcolor = brown]
+      if target-patch != nobody [
+        move-to target-patch
+      ]
+      ifelse show-energy = true [
+        set label (round (energy * 100) / 100)
+      ] [
+        set label ""
+      ]
+    ]
+  ]
+  ]
 
   ask sheep [
     move
-    reproduce-if-touching
     death
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
@@ -53,24 +112,65 @@ to go
     ]
   ]
 
-  ; Logique de repousse de l'herbe
-  ask patches [
-    if pcolor = brown [
-      set countdown countdown - 1
-      if countdown <= 0 [
-        set pcolor green
-      ]
+  ask promeneurs [
+    move-promeneurs
+    death
+    ifelse show-energy = true[
+      set label (round (energy * 100) / 100)
+    ]
+    [
+     set label ""
     ]
   ]
 
+  ; Logique de repousse de l'herbe
+  ask patches [
+;    if pcolor = brown [
+;      set countdown countdown - 1
+;      if countdown <= 0 [
+;        set pcolor green
+;      ]
+;    ]
+  ]
+
   tick
+end
+
+to move-promeneurs
+  ifelse random 1000 = 0 [
+    rt random 50 - random 50  ; Tourner dans une direction aléatoire
+    fd 1
+  ]
+  ; Sinon, comportement normal
+  [
+    rt random 50 - random 50
+    fd 1
+
+    ; Éviter de quitter le chemin
+    if pcolor != brown [
+      bk 1
+      set heading heading + 180
+      fd 1
+    ]
+  ]
+  if pcolor = green [
+    ; Incrémenter le compteur du patch
+    set visit-count visit-count + 1
+
+    ; Transformer en marron si seuil atteint
+    if visit-count > 3 [ ; Ajustez le seuil selon vos besoins
+      set pcolor brown
+      set visit-count 0  ; Réinitialiser le compteur
+    ]
+  ]
+  set energy energy - 1
 end
 
 to move
   let new-heading heading + random 50 - random 50
   set heading new-heading
   fd 1
-  if pcolor = gray [
+  if pcolor = brown [
     bk 1
     set heading heading + 180
     fd 1
@@ -78,15 +178,15 @@ to move
   set energy energy - 0.5
 end
 
-to reproduce-if-touching
-  let mates other sheep-here
-  if any? mates [
-    if random-float 100 < sheep-reproduce [
-      set energy energy * 8 / 10
-      hatch 1 [ rt random-float 360 fd 1 ]
-    ]
-  ]
-end
+;to reproduce-if-touching
+;  let mates other sheep-here
+;  if any? mates [
+;    if random-float 100 < sheep-reproduce [
+;      set energy energy * 8 / 10
+;      hatch 1 [ rt random-float 360 fd 1 ]
+;    ]
+;  ]
+;end
 
 to death
   if energy <= 0 [ die ]
@@ -136,19 +236,19 @@ to draw-line [x1 y1 x2 y2 path-choice]
   ; Tracer la ligne
   while [x1 != x2 or y1 != y2] [
     ; Colorer deux patches à gauche et à droite de la ligne
-    ask patch x1 y1 [ set pcolor gray ]
-    ask patch (x1 + 1) y1 [ set pcolor gray ]
-    ask patch (x1 - 1) y1 [ set pcolor gray ]
+    ask patch x1 y1 [ set pcolor brown ]
+    ask patch (x1 + 1) y1 [ set pcolor brown ]
+    ask patch (x1 - 1) y1 [ set pcolor brown ]
 
     if path-choice = 1 [
-      ask patch x1 (y1 + 1) [ set pcolor gray ]  ; Patch à droite
-      ask patch x1 (y1 - 1) [ set pcolor gray ]  ; Patch à gauche
+      ask patch x1 (y1 + 1) [ set pcolor brown ]  ; Patch à droite
+      ask patch x1 (y1 - 1) [ set pcolor brown ]  ; Patch à gauche
     ]
 
 
     if path-choice = 2 [
-      ask patch (x1 + 1) y1 [ set pcolor gray ]  ; Patch en haut
-      ask patch (x1 - 1) y1 [ set pcolor gray ]  ; Patch en bas
+      ask patch (x1 + 1) y1 [ set pcolor brown ]  ; Patch en haut
+      ask patch (x1 - 1) y1 [ set pcolor brown ]  ; Patch en bas
     ]
 
     let error2 (err * 2)
@@ -165,20 +265,22 @@ to draw-line [x1 y1 x2 y2 path-choice]
   ]
 
   ; Colorier le dernier patch en gris pour le chemin de 2 patch de largeur
-  ask patch x2 y2 [ set pcolor gray ]
-  ask patch (x2 + 1) y2 [ set pcolor gray ]
-  ask patch (x2 - 1) y2 [ set pcolor gray ]
+  ask patch x2 y2 [ set pcolor brown ]
+  ask patch (x2 + 1) y2 [ set pcolor brown ]
+  ask patch (x2 - 1) y2 [ set pcolor brown ]
 
   if path-choice = 1 [
-    ask patch x2 (y2 + 1) [ set pcolor gray ]
-    ask patch x2 (y2 - 1) [ set pcolor gray ]
+    ask patch x2 (y2 + 1) [ set pcolor brown ]
+    ask patch x2 (y2 - 1) [ set pcolor brown ]
   ]
 
   if path-choice = 2 [
-    ask patch (x2 + 1) y2 [ set pcolor gray ]
-    ask patch (x2 - 1) y2 [ set pcolor gray ]
+    ask patch (x2 + 1) y2 [ set pcolor brown ]
+    ask patch (x2 - 1) y2 [ set pcolor brown ]
   ]
 end
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -216,7 +318,7 @@ initial-number-sheep
 initial-number-sheep
 0
 250
-16.0
+25.0
 1
 1
 NIL
@@ -231,7 +333,7 @@ sheep-reproduce
 sheep-reproduce
 1.0
 20.0
-10.0
+4.0
 1.0
 1
 %
@@ -288,6 +390,7 @@ true
 "" ""
 PENS
 "sheep" 1.0 0 -612749 true "" "plot count sheep"
+"promeneurs" 1.0 0 -7500403 true "" "plot count promeneurs"
 
 MONITOR
 41
@@ -317,9 +420,35 @@ SWITCH
 298
 show-energy
 show-energy
-0
+1
 1
 -1000
+
+SLIDER
+0
+15
+187
+48
+initial-number-promeneurs
+initial-number-promeneurs
+0
+100
+12.0
+1
+1
+NIL
+HORIZONTAL
+
+MONITOR
+135
+305
+212
+350
+promeneurs
+count promeneurs
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
