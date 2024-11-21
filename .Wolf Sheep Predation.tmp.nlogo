@@ -81,6 +81,7 @@ end
 to reproduce-if-touching
   let mates other sheep-here
   if any? mates [
+
     if random-float 100 < sheep-reproduce [
       set energy energy * 8 / 10
       hatch 1 [ rt random-float 360 fd 1 ]
