@@ -315,6 +315,7 @@ to move-wolves
   if closest-sheep != nobody [
     face closest-sheep ; Se diriger vers le mouton le plus proche
 
+
     ; Manger le mouton s'il est suffisamment proche
     if distance closest-sheep < 1 [
       ask closest-sheep [ die ] ; Le mouton meurt
@@ -334,11 +335,6 @@ to move-wolves
 
   fd 0.5 ; Avancer après le mouvement
 
-  if pxcor = min-pxcor or pxcor = max-pxcor or pycor = min-pycor or pycor = max-pycor [
-    bk 1
-    set heading heading + 180
-    fd 1
-  ]
   set energy energy - 0.5 ; Réduction de l'énergie à chaque mouvement
 end
 
