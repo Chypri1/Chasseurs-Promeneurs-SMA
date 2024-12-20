@@ -10,7 +10,7 @@ patches-own [ countdown visit-count]
 
 
 ; Déclaration du switch dans l'interface utilisateur :
-; Créez un switch appelé `show-energy` qui peut être activé ou désactivé.
+; Créez un switch appelé show-energy qui peut être activé ou désactivé.
 
 to setup
   clear-all
@@ -41,25 +41,20 @@ to setup
     ]
   ]
 
-create-wolves initial-number-wolf [
-  set shape "wolf"
-  set color black
-  set size 1.5
-  set label-color blue - 2
-  set energy random 4000 + 1000
-
-  ; Assurez-vous qu'aucun loup ne soit trop proche des autres
-  while [any? other wolves with [distance myself < 3]] [
+  create-wolves initial-number-wolf [
+    set shape "wolf"
+    set color black
+    set size 1.5
+    set label-color blue - 2
+    set energy random 4000 + 1000
     setxy random-xcor random-ycor
+    ifelse show-energy = true[
+      set label (round (energy * 100) / 100)
+    ]
+    [
+     set label ""
+    ]
   ]
-
-  ifelse show-energy = true [
-    set label (round (energy * 100) / 100)
-  ] [
-    set label ""
-  ]
-]
-
 
   create-promeneurs initial-number-promeneurs [
     set shape "person"
@@ -226,35 +221,49 @@ to move
   set energy energy - 0.5 ; Réduction de l'énergie
 end
 
-
 to move-wolves
-  let closest-sheep min-one-of sheep [distance myself]  ; Trouver le mouton le plus proche
+  let closest-sheep min-one-of sheep [distance myself] ; Trouver le mouton le plus proche
+  let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
 
-  ifelse closest-sheep != nobody [
-    ; Se diriger vers le mouton tout en restant proche des autres loups
-    let target-x [xcor] of closest-sheep
-    let target-y [ycor] of closest-sheep
+  ; Chasser le mouton ou se déplacer aléatoirement
+  if closest-sheep != nobody [
+    face closest-sheep ; Se diriger vers le mouton le plus proche
+    fd 0.5 ; Avancer vers lui
 
-    ; garde les distance entre les loups
-    flock
-
-    ; Se déplacer vers le point cible (mouton ou ajusté)
-    face patch target-x target-y
-    fd 0.5
-
-    ; Vérifier si le mouton est suffisamment proche pour être attrapé
+    ; Manger le mouton s'il est suffisamment proche
     if distance closest-sheep < 1 [
-      ask closest-sheep [ die ]  ; Manger le mouton
-      set energy energy + 500    ; Augmenter l'énergie
+      ask closest-sheep [ die ] ; Le mouton meurt
+      set energy energy + 500 ; Augmenter l'énergie du loup
     ]
-  ][
-    flock
-    fd 0.5
   ]
 
-  set energy energy - 0.5  ; Réduction de l'énergie à chaque mouvement
+  ; Éviter les autres loups s'ils sont trop proches
+  if any? nearby-wolves [
+    let closest-wolf min-one-of nearby-wolves [distance myself] ; Loup le plus proche
+    if closest-wolf != nobody [
+      ; Tourner de 30° dans la direction opposée au loup le plus proche
+      let angle-to-closest-wolf towards closest-wolf
+      rt 30 - (angle-to-closest-wolf - heading) ; Tourner de 30° dans la direction opposée
+    ]
+  ]
+
+  fd 0.5 ; Avancer après le mouvement
+
+  set energy energy - 0.5 ; Réduction de l'énergie à chaque mouvement
 end
 
+
+
+
+;to reproduce-if-touching
+;  let mates other sheep-here
+;  if any? mates [
+;    if random-float 100 < sheep-reproduce [
+;      set energy energy * 8 / 10
+;      hatch 1 [ rt random-float 360 fd 1 ]
+;    ]
+;  ]
+;end
 
 to death
   if energy <= 0 [ die ]
@@ -293,6 +302,8 @@ to create-path
 
   draw-line x1 y1 x2 y2 path-choice
 end
+
+
 
 to draw-line [x1 y1 x2 y2 path-choice]
   let deltaX abs (x2 - x1)
@@ -347,110 +358,6 @@ to draw-line [x1 y1 x2 y2 path-choice]
     ask patch (x2 - 1) y2 [ set pcolor brown ]
   ]
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- to flock  ;; turtle procedure
-  let nearest-wolf min-one-of wolves in-radius 4 [distance myself]
-  let number-of-wolves count wolves in-radius 4  ; Nombre de loups proches dans un rayon de 4 unités
-   find-flockmates
-   if any? wolves
-     [ find-nearest-neighbor
-         ifelse distance nearest-wolf < 10
-         [ separate ]
-         [ align
-           cohere ] ]
- end
-
- to find-flockmates  ;; turtle procedure
-   let nearest-wolves wolves in-radius 4  ; Loups proches dans un rayon de 4 unités
- end
-
- to find-nearest-neighbor ;; turtle procedure
-   let nearest-wolves wolves in-radius 4  ; Loups proches dans un rayon de 4 unités
-   set nearest-wolves min-one-of wolves [distance myself]
- end
-
- ;;; SEPARATE
-
-to separate  ;; turtle procedure
-   let nearest-wolf min-one-of wolves in-radius 4 [distance myself]  ; Trouver le loup le plus proche
-   if nearest-wolf != nobody [  ; Vérifier s'il y a un loup proche
-      turn-away ([heading] of nearest-wolf) 4
-   ]
-end
-
- ;;; ALIGN
-
- to align  ;; turtle procedure
-   turn-towards average-flockmate-heading 30
- end
-
- to-report average-flockmate-heading  ;; turtle procedure
-   ;; We can't just average the heading variables here.
-   ;; For example, the average of 1 and 359 should be 0,
-   ;; not 180.  So we have to use trigonometry.
-   let x-component sum [dx] of wolves
-   let y-component sum [dy] of wolves
-   ifelse x-component = 0 and y-component = 0
-     [ report heading ]
-     [ report atan x-component y-component ]
- end
-
- ;;; COHERE
-
- to cohere  ;; turtle procedure
-   turn-towards average-heading-towards-flockmates 30
- end
-
- to-report average-heading-towards-flockmates  ;; turtle procedure
-   ;; "towards myself" gives us the heading from the other turtle
-   ;; to me, but we want the heading from me to the other turtle,
-   ;; so we add 180
-   let x-component mean [sin (towards myself + 180)] of wolves
-   let y-component mean [cos (towards myself + 180)] of wolves
-   ifelse x-component = 0 and y-component = 0
-     [ report heading ]
-     [ report atan x-component y-component ]
- end
-
- ;;; HELPER PROCEDURES
-
- to turn-towards [new-heading max-turn]  ;; turtle procedure
-   turn-at-most (subtract-headings heading new-heading) max-turn
- end
-
-to turn-away [new-heading max-turn]  ;; turtle procedure
-   turn-at-most (subtract-headings heading new-heading) max-turn
-end
-
-
- ;; turn right by "turn" degrees (or left if "turn" is negative),
- ;; but never turn more than "max-turn" degrees
- to turn-at-most [turn max-turn]  ;; turtle procedure
-   ifelse abs turn > max-turn
-     [ ifelse turn > 0
-         [ rt max-turn ]
-         [ lt max-turn ] ]
-     [ rt turn ]
- end
-
-
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -488,7 +395,7 @@ initial-number-sheep
 initial-number-sheep
 0
 25
-11.0
+8.0
 1
 1
 NIL
@@ -629,7 +536,7 @@ initial-number-wolf
 initial-number-wolf
 0
 100
-16.0
+15.0
 1
 1
 NIL
