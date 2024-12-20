@@ -1,7 +1,9 @@
 globals [ max-sheep coordonnees ]
+globals [ max-sheep  ]
 
 breed [ sheep a-sheep ]
 breed [ promeneurs a-promeneur]
+breed [ wolves a-wolf]
 
 turtles-own [ energy evade_mode]
 patches-own [ countdown visit-count]
@@ -10,7 +12,7 @@ promeneurs-own [direction vitesse ]
 
 
 ; Déclaration du switch dans l'interface utilisateur :
-; Créez un switch appelé `show-energy` qui peut être activé ou désactivé.
+; Créez un switch appelé show-energy qui peut être activé ou désactivé.
 
 to setup
   clear-all
@@ -30,6 +32,21 @@ to setup
   create-sheep initial-number-sheep [
     set shape "sheep"
     set color white
+    set size 1.5
+    set label-color blue - 2
+    set energy random 4000 + 1000
+    setxy random-xcor random-ycor
+    ifelse show-energy = true[
+      set label (round (energy * 100) / 100)
+    ]
+    [
+     set label ""
+    ]
+  ]
+
+  create-wolves initial-number-wolf [
+    set shape "wolf"
+    set color black
     set size 1.5
     set label-color blue - 2
     set energy random 4000 + 1000
@@ -73,6 +90,8 @@ to setup
 
   reset-ticks
 end
+
+
 
 to go
   if not any? turtles [ stop ]
@@ -130,6 +149,28 @@ to go
 
   ask sheep [
     move-sheep
+    death
+    ifelse show-energy = true[
+      set label (round (energy * 100) / 100)
+    ]
+    [
+      set label ""
+    ]
+  ]
+
+  ask wolves [
+    move-wolves
+    death
+    ifelse show-energy = true[
+      set label (round (energy * 100) / 100)
+    ]
+    [
+      set label ""
+    ]
+  ]
+
+  ask wolves [
+    move-wolves
     death
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
@@ -251,10 +292,65 @@ to move-sheep
   if pxcor = min-pxcor or pxcor = max-pxcor or pycor = min-pycor or pycor = max-pycor [
     bk 1
     set heading heading + 180
+to move
+  let nearby-wolves wolves in-radius 5 ; Loups proches dans un rayon de 5 unités
+  ifelse any? nearby-wolves [
+    ; Calculer le centre des loups proches
+    let wolf-center mean [xcor] of nearby-wolves
+    let wolf-center-y mean [ycor] of nearby-wolves
+
+    ; Calculer la direction opposée
+    face patch (2 * xcor - wolf-center) (2 * ycor - wolf-center-y)
+    fd 1 ; Fuir dans la direction opposée
+  ] [
+    ; Comportement aléatoire s'il n'y a pas de loups
+    let new-heading heading + random 50 - random 50
+    set heading new-heading
     fd 1
   ]
-  set energy energy - 0.5
+
+  ; Empêcher le mouton de quitter les zones marron
+  if pcolor = brown and any? nearby-wolves [
+    bk 1
+    set heading heading + 180
+    fd 1
+  ]
+  set energy energy - 0.5 ; Réduction de l'énergie
 end
+
+to move-wolves
+  let closest-sheep min-one-of sheep [distance myself] ; Trouver le mouton le plus proche
+  let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
+
+  ; Chasser le mouton ou se déplacer aléatoirement
+  if closest-sheep != nobody [
+    face closest-sheep ; Se diriger vers le mouton le plus proche
+    fd 0.5 ; Avancer vers lui
+
+    ; Manger le mouton s'il est suffisamment proche
+    if distance closest-sheep < 1 [
+      ask closest-sheep [ die ] ; Le mouton meurt
+      set energy energy + 500 ; Augmenter l'énergie du loup
+    ]
+  ]
+
+  ; Éviter les autres loups s'ils sont trop proches
+  if any? nearby-wolves [
+    let closest-wolf min-one-of nearby-wolves [distance myself] ; Loup le plus proche
+    if closest-wolf != nobody [
+      ; Tourner de 30° dans la direction opposée au loup le plus proche
+      let angle-to-closest-wolf towards closest-wolf
+      rt 30 - (angle-to-closest-wolf - heading) ; Tourner de 30° dans la direction opposée
+    ]
+  ]
+
+  fd 0.5 ; Avancer après le mouvement
+
+  set energy energy - 0.5 ; Réduction de l'énergie à chaque mouvement
+end
+
+
+
 
 ;to reproduce-if-touching
 ;  let mates other sheep-here
@@ -308,6 +404,10 @@ to create-path
   ][
    create-path
   ]
+  draw-line x1 y1 x2 y2 path-choice
+end
+
+
 
 
 end
@@ -413,13 +513,13 @@ ticks
 SLIDER
 5
 60
-179
+182
 93
 initial-number-sheep
 initial-number-sheep
 0
-250
-25.0
+25
+8.0
 1
 1
 NIL
@@ -491,7 +591,7 @@ true
 "" ""
 PENS
 "sheep" 1.0 0 -612749 true "" "plot count sheep"
-"promeneurs" 1.0 0 -7500403 true "" "plot count promeneurs"
+"promeneurs" 1.0 0 -2674135 true "" "plot count promeneurs"
 
 MONITOR
 41
@@ -528,7 +628,7 @@ show-energy
 SLIDER
 0
 15
-187
+217
 48
 initial-number-promeneurs
 initial-number-promeneurs
@@ -550,6 +650,21 @@ count promeneurs
 17
 1
 11
+
+SLIDER
+5
+95
+177
+128
+initial-number-wolf
+initial-number-wolf
+0
+100
+15.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
