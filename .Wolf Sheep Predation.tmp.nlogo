@@ -1,11 +1,12 @@
-globals [ max-sheep ]
+globals [ max-sheep coordonnees ]
 
 breed [ sheep a-sheep ]
 breed [ promeneurs a-promeneur]
 
-turtles-own [ energy ]
+turtles-own [ energy evade_mode]
 patches-own [ countdown visit-count]
 
+promeneurs-own [direction vitesse ]
 
 
 ; Déclaration du switch dans l'interface utilisateur :
@@ -14,7 +15,6 @@ patches-own [ countdown visit-count]
 to setup
   clear-all
   ifelse netlogo-web? [ set max-sheep 10000 ] [ set max-sheep 30000 ]
-  show shapes
 
   ; Initialisation des patches (fond vert)
   ask patches [
@@ -23,7 +23,9 @@ to setup
     set visit-count 0
   ]
 
+
   create-path  ; Créer le chemin
+  show coordonnees
 
   create-sheep initial-number-sheep [
     set shape "sheep"
@@ -41,21 +43,33 @@ to setup
   ]
 
   create-promeneurs initial-number-promeneurs [
-    set shape "butterfl"
-    set color red
+    set shape "person"
+    set color blue
     set size 2
     set energy random 4000 + 1000
-    let target-patch one-of patches with [pcolor = brown]
-    if target-patch != nobody [
-      move-to target-patch
+    set direction random 2
+    set vitesse precision (0.2 + random-float 0.4) 2
+    let x1 item 0 item 0 coordonnees
+    let y1 item 1 item 0 coordonnees
+    let x2 item 0 item 1 coordonnees
+    let y2 item 1 item 1 coordonnees
+
+    ; Placer la tortue sur la première ou la deuxième coordonnée
+    ifelse direction = 0 [
+      setxy x1 y1
     ]
-    ifelse show-energy = true[
+    [
+      setxy x2 y2
+    ]
+    ; Afficher l'énergie si nécessaire
+    ifelse show-energy = true [
       set label (round (energy * 100) / 100)
     ]
     [
-     set label ""
+      set label ""
     ]
   ]
+
 
   reset-ticks
 end
@@ -71,6 +85,7 @@ to go
       set color red
       set size 2
       set energy random 4000 + 1000
+      set direction random 2
       let target-patch one-of patches with [pcolor = brown]
       if target-patch != nobody [
         move-to target-patch
@@ -84,25 +99,37 @@ to go
     ]
     [
     create-promeneurs 1 [
-      set shape "person"
-      set color red
-      set size 2
-      set energy random 4000 + 1000
-      let target-patch one-of patches with [pcolor = brown]
-      if target-patch != nobody [
-        move-to target-patch
-      ]
-      ifelse show-energy = true [
-        set label (round (energy * 100) / 100)
-      ] [
-        set label ""
-      ]
+        set shape "person"
+        set color blue
+        set size 2
+        set energy random 4000 + 1000
+        set direction random 2
+        set vitesse precision (0.2 + random-float 0.3) 1
+        let x1 item 0 item 0 coordonnees
+        let y1 item 1 item 0 coordonnees
+        let x2 item 0 item 1 coordonnees
+        let y2 item 1 item 1 coordonnees
+
+        ; Placer la tortue sur la première ou la deuxième coordonnée
+        ifelse direction = 0 [
+          setxy x1 y1
+        ]
+        [
+          setxy x2 y2
+        ]
+        ; Afficher l'énergie si nécessaire
+        ifelse show-energy = true [
+          set label (round (energy * 100) / 100)
+        ]
+        [
+          set label ""
+        ]
     ]
   ]
   ]
 
   ask sheep [
-    move
+    move-sheep
     death
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
@@ -131,46 +158,97 @@ to go
 ;        set pcolor green
 ;      ]
 ;    ]
+    let x1 item 0 item 0 coordonnees
+    let y1 item 1 item 0 coordonnees
+    let x2 item 0 item 1 coordonnees
+    let y2 item 1 item 1 coordonnees
+    if (pxcor = x1 and pycor = y1) or (pxcor = x2 and pycor = y2)[
+     set pcolor black
+    ]
   ]
 
   tick
 end
 
 to move-promeneurs
-  ifelse random 1000 = 0 [
-    rt random 50 - random 50  ; Tourner dans une direction aléatoire
-    fd 1
+  ; Récupérer les coordonnées du chemin
+  let x1 item 0 item 0 coordonnees
+  let y1 item 1 item 0 coordonnees
+  let x2 item 0 item 1 coordonnees
+  let y2 item 1 item 1 coordonnees
+
+
+  ifelse direction = 0 [
+    ifelse x2 = pxcor and y2 = pycor[
+     set direction 1 - direction
+    ][
+      set heading towardsxy x2 y2
+    ]
+
   ]
-  ; Sinon, comportement normal
+   [
+    ifelse x1 = pxcor and y1 = pycor[
+     set direction 1 - direction
+    ][
+       set heading towardsxy x1 y1
+    ]
+  ]
+
+  ; Si le mode d'évasion est activé
+  ifelse evade_mode = true [
+    fd 1
+    if pcolor = brown [
+      set evade_mode false  ; Désactiver l'évasion quand on est de nouveau sur le chemin
+    ]
+  ]
+;   Sinon, comportement normal
   [
-    rt random 50 - random 50
-    fd 1
+    fd vitesse
 
-    ; Éviter de quitter le chemin
-    if pcolor != brown [
-      bk 1
-      set heading heading + 180
-      fd 1
-    ]
+;    ; Vérifier si le promeneur est toujours sur le chemin
+;    while [pcolor != brown] [
+;      ; Si le promeneur quitte le chemin, activez le mode d'évasion
+;      ifelse random 1000 < 1 [
+;        set evade_mode true
+;      ]
+;      [
+;        ; Sinon, faire demi-tour et revenir sur le chemin
+;        bk 1
+;        rt random 120
+;        fd 1
+;      ]
+;    ]
   ]
-  if pcolor = green [
-    ; Incrémenter le compteur du patch
-    set visit-count visit-count + 1
 
-    ; Transformer en marron si seuil atteint
-    if visit-count > 3 [ ; Ajustez le seuil selon vos besoins
-      set pcolor brown
-      set visit-count 0  ; Réinitialiser le compteur
-    ]
-  ]
+  ; Consommer de l'énergie
   set energy energy - 1
 end
 
-to move
+
+
+
+
+
+
+to move-sheep
   let new-heading heading + random 50 - random 50
   set heading new-heading
   fd 1
-  if pcolor = brown [
+  ifelse pcolor = brown [
+    ifelse random 10 != 0[
+      bk 1
+      if evade_mode = false[
+        set heading heading + 180
+      ]
+      fd 1
+    ][
+      set evade_mode true
+    ]
+  ][
+    set evade_mode false
+  ]
+  ; Si un mouton atteint la limite de la carte il fait demi-tour
+  if pxcor = min-pxcor or pxcor = max-pxcor or pycor = min-pycor or pycor = max-pycor [
     bk 1
     set heading heading + 180
     fd 1
@@ -223,9 +301,16 @@ to create-path
   let x2 [pxcor] of end-patch
   let y2 [pycor] of end-patch
 
-  draw-line x1 y1 x2 y2 path-choice
-end
+  ifelse (x1 <= max-pxcor and y1 <= max-pycor and
+         x2 <= max-pxcor and y2 <= max-pycor) [
+    set coordonnees (list (list x1 y1) (list x2 y2))
+    draw-line x1 y1 x2 y2 path-choice
+  ][
+   create-path
+  ]
 
+
+end
 to draw-line [x1 y1 x2 y2 path-choice]
   let deltaX abs (x2 - x1)
   let deltaY abs (y2 - y1)
@@ -235,20 +320,28 @@ to draw-line [x1 y1 x2 y2 path-choice]
 
   ; Tracer la ligne
   while [x1 != x2 or y1 != y2] [
-    ; Colorer deux patches à gauche et à droite de la ligne
-    ask patch x1 y1 [ set pcolor brown ]
-    ask patch (x1 + 1) y1 [ set pcolor brown ]
-    ask patch (x1 - 1) y1 [ set pcolor brown ]
-
-    if path-choice = 1 [
-      ask patch x1 (y1 + 1) [ set pcolor brown ]  ; Patch à droite
-      ask patch x1 (y1 - 1) [ set pcolor brown ]  ; Patch à gauche
-    ]
+    ; Vérifier si les coordonnées sont valides avant d'agir sur le patch
+    if (x1 >= min-pxcor and x1 <= max-pxcor and y1 >= min-pycor and y1 <= max-pycor) [
+      ask patch x1 y1 [ set pcolor brown ]
 
 
-    if path-choice = 2 [
-      ask patch (x1 + 1) y1 [ set pcolor brown ]  ; Patch en haut
-      ask patch (x1 - 1) y1 [ set pcolor brown ]  ; Patch en bas
+      if path-choice = 1 [
+        if y1 + 1 <= max-pycor [
+          ask patch x1 (y1 + 1) [ set pcolor brown ]  ; Patch à droite
+        ]
+        if y1 - 1 >= min-pycor [
+          ask patch x1 (y1 - 1) [ set pcolor brown ]  ; Patch à gauche
+        ]
+      ]
+
+      if path-choice = 2 [
+        if x1 - 1 >= min-pxcor [
+          ask patch (x1 - 1) y1 [ set pcolor brown ] ; Patch en bas
+        ]
+        if x1 + 1 <= max-pxcor [
+          ask patch (x1 + 1) y1 [ set pcolor brown ] ; Patch en haut
+        ]
+      ]
     ]
 
     let error2 (err * 2)
@@ -264,45 +357,53 @@ to draw-line [x1 y1 x2 y2 path-choice]
     ]
   ]
 
-  ; Colorier le dernier patch en gris pour le chemin de 2 patch de largeur
-  ask patch x2 y2 [ set pcolor brown ]
-  ask patch (x2 + 1) y2 [ set pcolor brown ]
-  ask patch (x2 - 1) y2 [ set pcolor brown ]
+  ; Vérifier et colorier le dernier patch uniquement si valide
+  if (x2 >= min-pxcor and x2 <= max-pxcor and y2 >= min-pycor and y2 <= max-pycor) [
+    ask patch x2 y2 [ set pcolor brown ]
 
-  if path-choice = 1 [
-    ask patch x2 (y2 + 1) [ set pcolor brown ]
-    ask patch x2 (y2 - 1) [ set pcolor brown ]
-  ]
 
-  if path-choice = 2 [
-    ask patch (x2 + 1) y2 [ set pcolor brown ]
-    ask patch (x2 - 1) y2 [ set pcolor brown ]
+
+    if path-choice = 1 [
+      if y2 + 1 <= max-pycor [
+        ask patch x2 (y2 + 1) [ set pcolor brown ]
+      ]
+      if y2 - 1 >= min-pycor [
+        ask patch x2 (y2 - 1) [ set pcolor brown ]
+      ]
+    ]
+
+    if path-choice = 2 [
+      if x2 - 1 >= min-pxcor [
+        ask patch (x2 - 1) y2 [ set pcolor brown ]
+      ]
+      if x2 + 1 <= max-pxcor [
+        ask patch (x2 + 1) y2 [ set pcolor brown ]
+      ]
+    ]
   ]
 end
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
 10
-873
-529
+1167
+823
 -1
 -1
-10.0
+4.0
 1
 14
 1
 1
 1
 0
+0
+0
 1
-1
-1
--25
-25
--25
-25
+-100
+100
+-100
+100
 1
 1
 1
@@ -333,7 +434,7 @@ sheep-reproduce
 sheep-reproduce
 1.0
 20.0
-4.0
+6.0
 1.0
 1
 %
@@ -433,7 +534,7 @@ initial-number-promeneurs
 initial-number-promeneurs
 0
 100
-12.0
+16.0
 1
 1
 NIL
