@@ -7,6 +7,8 @@ breed [ wolves a-wolf]
 turtles-own [ energy ]
 patches-own [ countdown visit-count]
 
+wolves-own [aiming cible]
+
 
 
 ; Déclaration du switch dans l'interface utilisateur :
@@ -47,6 +49,8 @@ create-wolves initial-number-wolf [
   set size 1.5
   set label-color blue - 2
   set energy random 4000 + 1000
+  set aiming 0
+  set cible sheep
 
   ; Assurez-vous qu'aucun loup ne soit trop proche des autres
   while [any? other wolves with [distance myself < 3]] [
@@ -243,9 +247,36 @@ to move-wolves
     fd 0.5
 
     ; Vérifier si le mouton est suffisamment proche pour être attrapé
-    if distance closest-sheep < 1 [
-      ask closest-sheep [ die ]  ; Manger le mouton
-      set energy energy + 500    ; Augmenter l'énergie
+    if distance closest-sheep < shooting-range [
+
+      ifelse aiming = 0 [
+        ; Mise en joue
+        set cible closest-sheep
+        ask cible [
+          set color blue
+        ]
+        set aiming ticks
+        ; print "Début aiming"
+        ; print ticks
+      ][
+        if ticks > aiming + ads-time[
+          ; print "Fin visée"
+          ; print aiming
+          ; print aiming + ads-time
+          ; Mise en joue terminée, la cible est-elle toujours à portée?
+          set closest-sheep min-one-of sheep [distance myself]
+          ; print closest-sheep
+          ; print cible
+          ifelse closest-sheep = cible [
+            ; print "Tir"
+            ask closest-sheep [ die ]  ; Manger le mouton
+            set energy energy + 500    ; Augmenter l'énergie
+          ][
+            ask cible [ set color white]
+          ]
+          set aiming 0
+        ]
+      ]
     ]
   ][
     flock
@@ -448,9 +479,6 @@ end
      [ rt turn ]
  end
 
-
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -488,7 +516,7 @@ initial-number-sheep
 initial-number-sheep
 0
 25
-11.0
+22.0
 1
 1
 NIL
@@ -629,11 +657,32 @@ initial-number-wolf
 initial-number-wolf
 0
 100
-16.0
+1.0
 1
 1
 NIL
 HORIZONTAL
+
+CHOOSER
+905
+20
+1043
+65
+shooting-range
+shooting-range
+15 25 30 150
+2
+
+INPUTBOX
+910
+105
+1062
+165
+ads-time
+10.0
+1
+0
+Number
 
 @#$#@#$#@
 ## WHAT IS IT?
