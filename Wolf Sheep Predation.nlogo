@@ -3,9 +3,10 @@ globals [ max-sheep coordonnees ]
 breed [ sheep a-sheep ]
 breed [ promeneurs a-promeneur]
 breed [ wolves a-wolf]
+breed [trees a-tree]
 
 turtles-own [ energy evade_mode]
-patches-own [ countdown visit-count]
+patches-own [ countdown ]
 
 promeneurs-own [direction vitesse ]
 
@@ -21,10 +22,11 @@ to setup
   ask patches [
     set pcolor green
     set countdown random 50
-    set visit-count 0
   ]
 
 
+  ; Génération arbre
+  generate-trees
   create-path  ; Créer le chemin
   show coordonnees
 
@@ -209,6 +211,47 @@ to go
 
   tick
 end
+
+
+to generate-trees
+  ask patches [
+    set pcolor green ; Réinitialiser le terrain
+  ]
+
+  ; Étape 1 : Définir des centres de forêts
+  let num-forests 10 ; Nombre de zones forestières
+  repeat num-forests [
+    let forest-center one-of patches
+    ask forest-center [
+      sprout-newtrees 1 ; Créer un arbre au centre
+      ; Étendre la forêt autour
+      grow-forest self 3 0.5 ; Étendre sur 3 unités de rayon avec une probabilité de 0.5
+    ]
+  ]
+end
+
+to sprout-newtrees [num]
+  create-trees num [
+    set shape "tree"
+    set color green + 2  ; Définir la couleur des arbres
+    set size random-float 0.8 + 0.5 ; Taille aléatoire entre 0.5 et 1.3
+  ]
+end
+
+to grow-forest [patch-center radius probability]
+  ; Cette procédure va essayer d'étendre la forêt à partir du centre
+  ask patch-center [
+    ; Étendre les arbres dans un rayon donné
+    ask patches in-radius radius [
+      if random-float 1.0 < probability and pcolor = green [
+        sprout-trees 1 ; Ajouter un arbre
+        set pcolor green + 1 ; Marquer ce patch comme une zone forestière
+      ]
+    ]
+  ]
+end
+
+
 
 to move-promeneurs
   ; Récupérer les coordonnées du chemin
