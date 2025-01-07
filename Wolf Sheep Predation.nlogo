@@ -934,14 +934,14 @@ HORIZONTAL
 @#$#@#$#@
 ## Qu'est ce que c'est 
 
-Ce modèle est une simulation d'une partie de chasse.
+Ce modèle est une simulation d'une partie de chasse devant soi.
 Cette simulation se base sur un modèle proie-prédateurs. Notre modèle explore donc les différents scénarios d'une chasse en France de nos jours. 
 
 Pour cela, nous avons défini et implémenté des règles de chasse actuelles qui sont censé permettre de réduire le nombre d'accidents liés à cette pratique. 
 
 Les différentes règles que nous avons implémenté sont :
-- Le fait de casser le fusil quand on ne met pas en joue un animal. 
-- Le fait d'avoir de la signalisation à l'entrée des zones de chasse qui croise un sentier.
+- Charger le fusil avant de mettre en joue un animal. 
+- Signalisation à l'entrée des zones de chasse qui croise un sentier.
 - Les promeneurs font donc demi tour quand ils voient le panneau zone de chasse.
 - Les chasseurs restent dans la zone de chasse. 
 - Les chasseurs se déplacent en formation.
@@ -953,37 +953,37 @@ Les différentes règles que nous avons implémenté sont :
 
 Il y a deux principales utilisations à ce modèle. 
 
-Le premier avec la zone de chasse permet de définir une zone dans laquelle les chasseurs doivent resté mais pas les proies et donc une zone restrainte seulement pour les prédateurs.En plus de cela et de facon aléatoire un chemin pédestre peut la traverser pour simuler le comportement des chasseurs dans la cas, certes rare, où des promeneurs l'emprunteraient dans la cas ou ils n'auraient pas vu ou pas tenu compte des panneaux normalement censé se situer à l'entrée d'une zone de chasse qui coupent un sentier. 
+Le premier avec la zone de chasse permet de définir une zone dans laquelle les chasseurs doivent rester mais pas les proies. Les prédateurs sont donc confinés dans une zone restreinte. En plus de cela et de façon aléatoire un chemin pédestre peut la traverser pour simuler le comportement des chasseurs dans le cas, certes rare, où des promeneurs imprudents se retrouveraient pris au milieu d'une partie de chasse. 
 
-Le second sans la zone de chasse permet de zoomer sur une zone de chasse plus grande où dans ce cas précis les animaux ne pourraient pas non plus s'échapper. Cela peut être le cas dans des zones grillagées.
+Le second cas, sans la zone de chasse, permet de voir les chasseurs évoluer sur une zone de chasse plus grande. Dans ce cas animaux et prédateurs sont confinés au sein du même espace, personne ne pouvant en sortir. Cela peut être le cas dans des zones grillagées.
 Dans ce cas, les prédateurs et les proies restent dans la même zone et seul le temps permet de finir la partie de chasse.
 Des promeneurs sont aussi présent dans la zone de chasse.
 
 #### génération du chemin
-Pour générer notre chemin, nous utilisons l'algorithme de tracé de segment de Bresenham. Le principe est de définir deux points et de les relier entre puis de vérifier les patches qui sont parcourus pour les colorier. 
+Pour générer notre chemin, nous utilisons l'algorithme de tracé de segment de Bresenham. Le principe est de définir deux points, de les relier entre eux, puis de vérifier les patches qui sont parcourus pour les colorier. 
 
 #### génération des panneauxs
-En ce qui concerne les panneaux, ils sont générés dans le cas où la zone de chasse, qui est généré aléatoirement, vient croiser le chemin. Dans ce cas précis, les panneaux s'affichent de telle sorte que les panneaux suivent la limite de la zone de chasse sur les patches marrons du chemin. 
+En ce qui concerne les panneaux, ils sont générés dans le cas où la zone de chasse, qui est générée aléatoirement, vient croiser le chemin. Dans ce cas précis, les panneaux s'affichent de telle sorte que les panneaux suivent la limite de la zone de chasse sur les patches marrons du chemin. 
 
 
 ## Comment l'utiliser
 
 1. Définir le type de modèle (avec ou sans la zone de chasse)
-2. Ajuster les paramètres pour faire correspondre à la simulation
+2. Ajuster les paramètres pour faire correspondre à la simulation recherchée
 3. appuyer sur SETUP.
 4. Appuyer sur GO et regarder la simulation.
 5. regarder les différentes courbes au cours du temps. 
-6. La simulation s'arrête après que les moutons sont tous mort.
+6. La simulation s'arrête lorsque tous les moutons sont morts.
 
 ### Paramètres:
 
-- vision-range (distance de vue) à ajouter 
-- shooting-range (distance de tir) ajouté
-- ads-time (aim down sight, temps de mise en joue) ajouté
-- initial-number-promeneurs (nombre de promeneurs au début) ajouté 
-- initial-number-sheep (nombre de mouton/proie au début) ajouté
-- initial-number-wolf (nombre de loups/chasseur au début) ajouté
-- zone-de-chasse (visualisation d'une zone de chasse) à ajouter 
+- vision-range (distance de vue)
+- shooting-range (distance de tir)
+- ads-time (aim down sight, temps de mise en joue)
+- initial-number-promeneurs (nombre de promeneurs au début) 
+- initial-number-sheep (nombre de mouton/proie au début)
+- initial-number-wolf (nombre de loups/chasseur au début)
+- hunting-zone (visualisation d'une zone de chasse)
 
 
 
@@ -991,9 +991,9 @@ En ce qui concerne les panneaux, ils sont générés dans le cas où la zone de 
 
 différents graphes de populations:
 
-graphes du nombre de fois ou il vise et il arrete :
-- nombre de fois ou il arrete à cause d'un animal trop loin
-- nombre de fois ou il arrete à cause d'un chasseur/promeneur
+graphes du nombre de mises en joues interrompues :
+- car l'animal est trop loin
+- à cause d'un chasseur/promeneur dans la ligne de tir
 
  
 
@@ -1009,7 +1009,7 @@ Par exemple, ajuster la distance de vision plus loin que la distance de tir.
 ### Réglementation chasse
 source: Fédération des Chasseurs Français
 #### Saison de chasse: 
-ouverture: 1er -> 4ème dimanche de Septembre selon dpt
+ouverture: 1er -> 4ème dimanche de Septembre selon département
 fermeture: dernier jour de février
 Chaque jour de 1h avant le lever du soleil à 1h après son coucher
 
@@ -1022,6 +1022,7 @@ Interdiction de tir en direction de stades, lieux de réunion publiques, habitat
 Port d’un vêtement réglementaire pour toute personne participant à l’acte de chasse
 Signalisation aux entrées principales des zones de chasse
 	Arme cassée et vide en cas d’approche
+Toujours garder un angle de 30° entre la zone visée et la position des autres chasseurs
 
 #### Consignes de sécurité en promenade :
 Si coup de fusil entendu, essayer de “modifier l’itineraire”
