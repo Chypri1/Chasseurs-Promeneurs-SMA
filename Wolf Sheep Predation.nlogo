@@ -670,8 +670,11 @@ end
 GRAPHICS-WINDOW
 355
 10
+1167
+823
 -1
 -1
+4.0
 1
 14
 1
@@ -681,6 +684,10 @@ GRAPHICS-WINDOW
 0
 0
 1
+-100
+100
+-100
+100
 1
 1
 1
@@ -695,6 +702,8 @@ SLIDER
 initial-number-sheep
 initial-number-sheep
 0
+25
+8.0
 1
 1
 NIL
@@ -835,6 +844,7 @@ initial-number-wolf
 initial-number-wolf
 0
 100
+15.0
 1
 1
 NIL
