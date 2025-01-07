@@ -1,5 +1,6 @@
 ;;shooting-range ads-time parametre
-globals [ max-sheep coordonnees shooting-range ads-time]
+globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2 shooting-range ads-time]
+
 
 breed [ sheep a-sheep ]
 breed [ promeneurs a-promeneur]
@@ -12,9 +13,6 @@ promeneurs-own [direction vitesse ]
 
 wolves-own [aiming cible]
 
-
-; Déclaration du switch dans l'interface utilisateur :
-; Créez un switch appelé show-energy qui peut être activé ou désactivé.
 
 to setup
   clear-all
@@ -29,24 +27,26 @@ to setup
     set visit-count 0
   ]
 
-
   create-path  ; Créer le chemin
   show coordonnees
+  draw-hunting-zone  ; Dessiner le cadre rouge
+
+
 
   create-sheep initial-number-sheep [
-    set shape "sheep"
-    set color white
-    set size 1.5
-    set label-color blue - 2
-    set energy random 4000 + 1000
-    setxy random-xcor random-ycor
-    ifelse show-energy = true[
-      set label (round (energy * 100) / 100)
-    ]
-    [
-     set label ""
-    ]
+  set shape "sheep"
+  set color white
+  set size 1.5
+  set label-color blue - 2
+  set energy random 4000 + 1000
+  setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1
+        random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+  ifelse show-energy = true [
+    set label (round (energy * 100) / 100)
+  ] [
+    set label ""
   ]
+
 
   create-wolves initial-number-wolf [
     set shape "wolf"
@@ -57,6 +57,7 @@ to setup
     set aiming 0
     set cible sheep
     setxy random-xcor random-ycor
+    setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1 random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
     ]
@@ -70,6 +71,7 @@ to setup
       hide-link
     ]
   ]
+
   create-promeneurs initial-number-promeneurs [
     set shape "person"
     set color blue
@@ -222,6 +224,9 @@ to go
   tick
 end
 
+
+
+
 to move-promeneurs
   ; Récupérer les coordonnées du chemin
   let x1 item 0 item 0 coordonnees
@@ -229,53 +234,40 @@ to move-promeneurs
   let x2 item 0 item 1 coordonnees
   let y2 item 1 item 1 coordonnees
 
-
-  ifelse direction = 0 [
-    ifelse x2 = pxcor and y2 = pycor[
-     set direction 1 - direction
-    ][
-      set heading towardsxy x2 y2
+  ; Vérifier si le promeneur est à côté d'une tortue "stop-sign"
+  ifelse any? turtles-here with [shape = "tree"] [
+    if random-float 1 <= 0.95 [ ; 95 % des cas
+      set direction 1 - direction ; Faire demi-tour
+      fd vitesse * 3 ; Avancer dans la nouvelle direction
+      stop ; Ne pas continuer d'autres actions
     ]
-
-  ]
-   [
-    ifelse x1 = pxcor and y1 = pycor[
-     set direction 1 - direction
-    ][
-       set heading towardsxy x1 y1
+  ][
+    ; Déterminer la direction normale du promeneur
+    ifelse direction = 0 [
+      ifelse x2 = pxcor and y2 = pycor [
+        ; Si le promeneur atteint la fin du chemin, changer de direction
+        set direction 1 - direction
+      ][
+        ; Avancer vers la fin du chemin
+        set heading towardsxy x2 y2
+      ]
+    ] [
+      ifelse x1 = pxcor and y1 = pycor [
+        ; Si le promeneur atteint le début du chemin, changer de direction
+        set direction 1 - direction
+      ][
+      ; Avancer vers le début du chemin
+        set heading towardsxy x1 y1
+      ]
     ]
   ]
 
-  ; Si le mode d'évasion est activé
-  ifelse evade_mode = true [
-    fd 1
-    if pcolor = brown [
-      set evade_mode false  ; Désactiver l'évasion quand on est de nouveau sur le chemin
-    ]
-  ]
-;   Sinon, comportement normal
-  [
-    fd vitesse
-
-;    ; Vérifier si le promeneur est toujours sur le chemin
-;    while [pcolor != brown] [
-;      ; Si le promeneur quitte le chemin, activez le mode d'évasion
-;      ifelse random 1000 < 1 [
-;        set evade_mode true
-;      ]
-;      [
-;        ; Sinon, faire demi-tour et revenir sur le chemin
-;        bk 1
-;        rt random 120
-;        fd 1
-;      ]
-;    ]
-  ]
+  ; Déplacement normal
+  fd vitesse
 
   ; Consommer de l'énergie
   set energy energy - 1
 end
-
 
 
 to move-sheep
@@ -386,7 +378,7 @@ to-report shoot-hit?
 end
 
 to move-wolves
-  let closest-sheep min-one-of sheep [distance myself] ; Trouver le mouton le plus proche
+  let closest-sheep min-one-of (sheep in-radius 30) [distance myself] ; Trouver le mouton le plus proche
   let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
 
   ; Chasser le mouton ou se déplacer aléatoirement
@@ -446,16 +438,25 @@ to move-wolves
     ]
   ]
 
-  fd 0.5 ; Avancer après le mouvement
+  ; Vérifier si le patch sous le loup est rouge
+  ifelse pcolor = red [
+    bk 1 ; Reculer légèrement
+    set heading heading + 180 ; Faire demi-tour
+    fd 1 ; Avancer après demi-tour
+  ]
+  [
+    fd 0.5 ; Sinon avancer normalement
+  ]
 
+  ; Éviter de sortir des limites du monde
   if pxcor = min-pxcor or pxcor = max-pxcor or pycor = min-pycor or pycor = max-pycor [
     bk 1
     set heading heading + 180
     fd 1
   ]
+
   set energy energy - 0.5 ; Réduction de l'énergie à chaque mouvement
 end
-
 
 
 
@@ -472,6 +473,19 @@ end
 to death
   if energy <= 0 [ die ]
 end
+
+
+
+
+
+;
+;
+;
+;  fonction pour la création du plateau/ de la carte
+;
+;
+;
+
 
 to create-path
   let path-choice random 2 + 1
@@ -585,6 +599,73 @@ to draw-line [x1 y1 x2 y2 path-choice]
     ]
   ]
 end
+
+to draw-hunting-zone
+  let margin 1 ; Taille du décalage pour réduire le cadre
+  let min-width 40
+  let min-height 40
+  let hunting-zone-valid? false ; Indicateur de validité de la zone
+
+  ; Générer une zone valide qui respecte les contraintes de visibilité et de superficie minimale
+  while [not hunting-zone-valid?] [
+    ; Générer des coordonnées aléatoires pour les coins de la zone de chasse (en entiers)
+    let x1 round (random (max-pxcor - margin - min-pxcor - margin)) + min-pxcor + margin
+    let y1 round (random (max-pycor - margin - min-pycor - margin)) + min-pycor + margin
+    let x2 round (random (max-pxcor - margin - min-pxcor - margin)) + min-pxcor + margin
+    let y2 round (random (max-pycor - margin - min-pycor - margin)) + min-pycor + margin
+
+    ; S'assurer que (x1, y1) est en haut à gauche et (x2, y2) en bas à droite
+    let x-left min list x1 x2
+    let x-right max list x1 x2
+    let y-bottom min list y1 y2
+    let y-top max list y1 y2
+
+    ; Calculer la largeur et la hauteur de la zone
+    let width x-right - x-left
+    let height y-top - y-bottom
+
+    ; Vérifier si la superficie respecte la contrainte
+    if (width >= min-width and height >= min-height) [
+      ; Mettre à jour les coordonnées globales et marquer comme valide
+      set hunting-zone-x1 x-left
+      set hunting-zone-y1 y-top
+      set hunting-zone-x2 x-right
+      set hunting-zone-y2 y-bottom
+      set hunting-zone-valid? true
+    ]
+  ]
+
+  ; Tracer les bords de la zone en rouge
+  ask patches [
+    if (pxcor = hunting-zone-x1 and pycor >= hunting-zone-y2 and pycor <= hunting-zone-y1) or ; Bord gauche
+       (pxcor = hunting-zone-x2 and pycor >= hunting-zone-y2 and pycor <= hunting-zone-y1) or ; Bord droit
+       (pycor = hunting-zone-y2 and pxcor >= hunting-zone-x1 and pxcor <= hunting-zone-x2) or ; Bord bas
+       (pycor = hunting-zone-y1 and pxcor >= hunting-zone-x1 and pxcor <= hunting-zone-x2)    ; Bord haut
+    [
+      set pcolor red ; Définir la couleur des bords
+
+    ]
+  ]
+
+ ; je voudrais que si les lignes rouges coupent le chemin marron alors il y a des shapes qui apparaissent à leurs croisement
+  add-stop-signs-at-crossings
+end
+
+to add-stop-signs-at-crossings
+  ; Identifier les patches correspondant aux bords rouges de la zone de chasse
+  ask patches with [pcolor = red] [
+    ; Vérifier si ce patch rouge est aussi sur le chemin marron
+    if pcolor = red and any? neighbors4 with [pcolor = brown] [
+      ; Créer une tortue "panneau stop" à cet emplacement
+      sprout 1 [
+        set shape "tree" ; Assurez-vous que la forme "stop-sign" est définie dans l'interface
+        set size 5 ; Ajuster la taille du panneau si nécessaire
+        set color yellow ; Définir la couleur du panneau
+      ]
+    ]
+  ]
+end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -628,7 +709,7 @@ sheep-reproduce
 sheep-reproduce
 1.0
 20.0
-6.0
+20.0
 1.0
 1
 %
@@ -760,39 +841,45 @@ NIL
 HORIZONTAL
 
 @#$#@#$#@
-## WHAT IS IT?
+## Qu'est ce que c'est 
 
-This model explores the stability of predator-prey ecosystems. Such a system is called unstable if it tends to result in extinction for one or more species involved.  In contrast, a system is stable if it tends to maintain itself over time, despite fluctuations in population sizes.
+Ce modèle est une simulation d'une partie de chasse.
+Cette simulation se base sur un modèle proie-prédateurs. Notre modèle explore donc les différents scénarios d'une chasse en France de nos jours. 
 
-## HOW IT WORKS
+Pour cela, nous avons défini et implémenté des règles de chasse actuelles qui sont censé permettre de réduire le nombre d'accidents liés à cette pratique. 
 
-There are two main variations to this model.
+Les différentes règles que nous avons implémenté sont :
+- Le fait de casser le fusil quand on ne met pas en joue un animal. 
+- Le fait d'avoir de la signalisation à l'entrée des zones de chasse qui croise un sentier.
+- Les promeneurs font donc demi tour quand ils voient le panneau zone de chasse.
+- Les chasseurs restent dans la zone de chasse. 
+- Les chasseurs se déplacent en formation.
+- Les chasseurs ne tirent pas en direction de promeneurs ni de chasseurs.
 
-In the first variation, the "sheep-wolves" version, wolves and sheep wander randomly around the landscape, while the wolves look for sheep to prey on. Each step costs the wolves energy, and they must eat sheep in order to replenish their energy - when they run out of energy they die. To allow the population to continue, each wolf or sheep has a fixed probability of reproducing at each time step. In this variation, we model the grass as "infinite" so that sheep always have enough to eat, and we don't explicitly model the eating or growing of grass. As such, sheep don't either gain or lose energy by eating or moving. This variation produces interesting population dynamics, but is ultimately unstable. This variation of the model is particularly well-suited to interacting species in a rich nutrient environment, such as two strains of bacteria in a petri dish (Gause, 1934).
 
-The second variation, the "sheep-wolves-grass" version explicitly models grass (green) in addition to wolves and sheep. The behavior of the wolves is identical to the first variation, however this time the sheep must eat grass in order to maintain their energy - when they run out of energy they die. Once grass is eaten it will only regrow after a fixed amount of time. This variation is more complex than the first, but it is generally stable. It is a closer match to the classic Lotka Volterra population oscillation models. The classic LV models though assume the populations can take on real values, but in small populations these models underestimate extinctions and agent-based models such as the ones here, provide more realistic results. (See Wilensky & Rand, 2015; chapter 4).
 
-The construction of this model is described in two papers by Wilensky & Reisman (1998; 2006) referenced below.
+## Comment cela fonctionne 
 
-## HOW TO USE IT
+Il y a deux principales utilisations à ce modèle. 
 
-1. Set the model-version chooser to "sheep-wolves-grass" to include grass eating and growth in the model, or to "sheep-wolves" to only include wolves (black) and sheep (white).
-2. Adjust the slider parameters (see below), or use the default settings.
-3. Press the SETUP button.
-4. Press the GO button to begin the simulation.
-5. Look at the monitors to see the current population sizes
-6. Look at the POPULATIONS plot to watch the populations fluctuate over time
+Le premier avec la zone de chasse permet de définir une zone dans laquelle les chasseurs doivent resté mais pas les proies et donc une zone restrainte seulement pour les prédateurs.En plus de cela et de facon aléatoire un chemin pédestre peut la traverser pour simuler le comportement des chasseurs dans la cas, certes rare, où des promeneurs l'emprunteraient dans la cas ou ils n'auraient pas vu ou pas tenu compte des panneaux normalement censé se situer à l'entrée d'une zone de chasse qui coupent un sentier. 
 
-Parameters:
-MODEL-VERSION: Whether we model sheep wolves and grass or just sheep and wolves
-INITIAL-NUMBER-SHEEP: The initial size of sheep population
-INITIAL-NUMBER-WOLVES: The initial size of wolf population
-SHEEP-GAIN-FROM-FOOD: The amount of energy sheep get for every grass patch eaten (Note this is not used in the sheep-wolves model version)
-WOLF-GAIN-FROM-FOOD: The amount of energy wolves get for every sheep eaten
-SHEEP-REPRODUCE: The probability of a sheep reproducing at each time step
-WOLF-REPRODUCE: The probability of a wolf reproducing at each time step
-GRASS-REGROWTH-TIME: How long it takes for grass to regrow once it is eaten (Note this is not used in the sheep-wolves model version)
-SHOW-ENERGY?: Whether or not to show the energy of each animal as a number
+Le second sans la zone de chasse permet de zoomer sur une zone de chasse plus grande où dans ce cas précis les animaux ne pourraient pas non plus s'échapper. Cela peut être le cas dans des zones grillagées près de grands axes comme des autoroutes ou nationales à 110km/h.
+Dans ce cas, les prédateurs et les proies restent dans la même zone et seul le temps permet de finir la partie de chasse.
+Des promeneurs sont aussi présent dans la zone de chasse 
+
+## Comment l'utiliser
+
+1. Définir le type de modèle (avec ou sans la zone de chasse)
+2. Ajuster les paramètres pour faire correspondre à la simulation
+3. appuyer sur SETUP.
+4. Appuyer sur GO et regarder la simulation.
+5. regarder les différentes courbes au cours du temps. 
+
+Paramètres:
+
+## ajouter les paramètres
+
 
 Notes:
 - one unit of energy is deducted for every step a wolf takes
@@ -802,13 +889,6 @@ There are three monitors to show the populations of the wolves, sheep and grass 
 
 If there are no wolves left and too many sheep, the model run stops.
 
-## THINGS TO NOTICE
-
-When running the sheep-wolves model variation, watch as the sheep and wolf populations fluctuate. Notice that increases and decreases in the sizes of each population are related. In what way are they related? What eventually happens?
-
-In the sheep-wolves-grass model variation, notice the green line added to the population plot representing fluctuations in the amount of grass. How do the sizes of the three populations appear to relate now? What is the explanation for this?
-
-Why do you suppose that some variations of the model might be stable while others are not?
 
 ## THINGS TO TRY
 
@@ -835,107 +915,6 @@ Can you modify the model so that wolves actively chase sheep?
 Note the use of breeds to model two different kinds of "turtles": wolves and sheep. Note the use of patches to model grass.
 
 Note the use of the ONE-OF agentset reporter to select a random sheep to be eaten by a wolf.
-
-### BEHAVIORSPACE FEATURES
-
-For more information about BehaviorSpace and the features introduced in NetLogo 6.4.0 see the [documentation](https://ccl.northwestern.edu/netlogo/docs/behaviorspace.html).
-
-The “New BehaviorSpace Features” experiment illustrates some of the BehaviorSpace features introduced in NetLogo 6.4.0. You can open BehaviorSpace using the Tools -> BehaviorSpace menu item. Click the EDIT button to see the details of the experiment.
-
-Note the use of 3 repetitions, so there is enough data to calculate the standard deviation of metrics at steps where data is available for all repetitions.
-
-Note the use of metrics that return lists, which can be processed in the Lists and Statistics Outputs.
-
-Note the use of a reporter to conditionally record metrics every other tick.
-
-Note the use of pre experiment and post experiment commands to show the total elapsed time in the command center at the end of the experiment.
-
-Click the OK button to finish viewing/editing the experiment.
-
-The “Wolf Sheep Crossing” experiment illustrates the use of a reporter to capture interesting behavior, in this case the approximate periodicity of the simulation.
-
-The “BehaviorSpace run 3 experiments” experiment shows how to use the subexperiment syntax (introduced in NetLogo 6.4.0) to run three different experiments. If you uncheck UPDATE VIEW, check UPDATE PLOTS AND MONITORS, and select 1 for SIMULTANEOUS RUNS IN PARALLEL the plots will show you how the experiments differ significantly. The results are also written to the COMMAND CENTER. Since there are list reporters as metrics there is no value to using the lists output format. Since there is only one repetition, there is no value to using statistics output format.
-
-The “BehaviorSpace run 3 variable values per experiments” experiment is an example of how to use the subexperiment syntax to try multiple values of a variable non-combinatorially. Notice that default values need to be provided because the subexperiments only give the value of one of the variables explicitly.
-
-The “BehaviorSpace subset” experiment makes use of the subexperiment syntax to run multiple combinations on a single line. Compare this to the combinatorial combination of the same variable values in the experiment “BehaviorSpace combinatorial”.
-
-## THINGS TO TRY - BEHAVIORSPACE
-
-Use the EXPORT button to save the "New BehaviorSpace Features" experiment as an XML file. Then open the Wolf Sheep Stride Inheritance model and use the IMPORT button to add the "New BehaviorSpace Features" experiment to the model. Run the experiment in this model.
-
-Create your own experiments to explore how the different variables interact. What is the most dynamically stable combination you can find?
-
-With the "New BehaviorSpace Features" experiment explore the effect on the total time of varying your choices for  UPDATE VIEW, UPDATE PLOTS AND MONITORS, and SIMULTANEOUS RUNS IN PARALLEL. Which combination is the fastest? The slowest?
-
-
-### Reproducibility of Experiments
-
-The experiment “New BehaviorSpace Features Reproducible” produces the same numerical results every time it is run. You can see this by running the experiment twice and saving spreadsheet output with two different names. If you compare the files they will differ only in the line that includes the time at which the experiment was run.
-
-Contrast this to what happens when you do the same thing with the experiment “New BehaviorSpace Features”. In this case the results vary between runs because the NetLogo code includes primitives that introduce randomness, such as RANDOM, RANDOM-XCOR, RANDOM-YCOR and RANDOM-FLOAT. Sometimes it is desirable to have the same outcome each time the experiment is run, for example to show interesting behavior that only happens some of the time or to create a predictable lesson or demonstration. The output of the random functions is made reproducible by the line "random-seed (474 + behaviorspace-run-number)" in the setup command section.
-
-What is the effect of each of the following changes on multiple experiment runs:
-
-- Changing 474 to another number?
-- Removing the addition of behaviorspace-run-number?
-- Moving setup to before the random-seed line?
-- Replacing the random-seed line with new-seed?
-
-With the experiments “New BehaviorSpace Features” and “New BehaviorSpace Features Reproducible” explore whether output values change when you try the following actions:
-
-- Use the slider to vary `wolf-gain-from-food`
-- Use sliders to change other variables
-- Use the chooser to select `sheep-wolves`
-- Use the switch to turn on `show-energy?`
-
-Output values for the experiment “New BehaviorSpace Features Reproducible” remain unchanged because the value of all Interface variables is specified. Note that when you start a new experiment the variables section specifies all the slider variables, but not any chooser or switch variables.
-
-## RELATED MODELS
-
-Look at Rabbits Grass Weeds for another model of interacting populations with different rules.
-
-## CREDITS AND REFERENCES
-
-Wilensky, U. & Reisman, K. (1998). Connected Science: Learning Biology through Constructing and Testing Computational Theories -- an Embodied Modeling Approach. International Journal of Complex Systems, M. 234, pp. 1 - 12. (The Wolf-Sheep-Predation model is a slightly extended version of the model described in the paper.)
-
-Wilensky, U. & Reisman, K. (2006). Thinking like a Wolf, a Sheep or a Firefly: Learning Biology through Constructing and Testing Computational Theories -- an Embodied Modeling Approach. Cognition & Instruction, 24(2), pp. 171-209. http://ccl.northwestern.edu/papers/wolfsheep.pdf .
-
-Wilensky, U., & Rand, W. (2015). An introduction to agent-based modeling: Modeling natural, social and engineered complex systems with NetLogo. Cambridge, MA: MIT Press.
-
-Lotka, A. J. (1925). Elements of physical biology. New York: Dover.
-
-Volterra, V. (1926, October 16). Fluctuations in the abundance of a species considered mathematically. Nature, 118, 558–560.
-
-Gause, G. F. (1934). The struggle for existence. Baltimore: Williams & Wilkins.
-
-## HOW TO CITE
-
-If you mention this model or the NetLogo software in a publication, we ask that you include the citations below.
-
-For the model itself:
-
-* Wilensky, U. (1997).  NetLogo Wolf Sheep Predation model.  http://ccl.northwestern.edu/netlogo/models/WolfSheepPredation.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
-
-Please cite the NetLogo software as:
-
-* Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
-
-## COPYRIGHT AND LICENSE
-
-Copyright 1997 Uri Wilensky.
-
-![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
-
-This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 License.  To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/3.0/ or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
-
-Commercial licenses are also available. To inquire about commercial licenses, please contact Uri Wilensky at uri@northwestern.edu.
-
-This model was created as part of the project: CONNECTED MATHEMATICS: MAKING SENSE OF COMPLEX PHENOMENA THROUGH BUILDING OBJECT-BASED PARALLEL MODELS (OBPML).  The project gratefully acknowledges the support of the National Science Foundation (Applications of Advanced Technologies Program) -- grant numbers RED #9552950 and REC #9632612.
-
-This model was converted to NetLogo as part of the projects: PARTICIPATORY SIMULATIONS: NETWORK-BASED DESIGN FOR SYSTEMS LEARNING IN CLASSROOMS and/or INTEGRATED SIMULATION AND MODELING ENVIRONMENT. The project gratefully acknowledges the support of the National Science Foundation (REPP & ROLE programs) -- grant numbers REC #9814682 and REC-0126227. Converted from StarLogoT to NetLogo, 2000.
-
-<!-- 1997 2000 -->
 @#$#@#$#@
 default
 true
