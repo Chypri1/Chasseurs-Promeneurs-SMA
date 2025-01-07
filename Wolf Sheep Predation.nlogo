@@ -684,7 +684,7 @@ to add-stop-signs-at-crossings
     if pcolor = red and any? neighbors4 with [pcolor = brown] [
       ; Créer une tortue "panneau stop" à cet emplacement
       sprout 1 [
-        set shape "tree" ; Assurez-vous que la forme "stop-sign" est définie dans l'interface
+        set shape "warning" ; Assurez-vous que la forme "stop-sign" est définie dans l'interface
         set size 5 ; Ajuster la taille du panneau si nécessaire
         set color yellow ; Définir la couleur du panneau
       ]
@@ -863,7 +863,7 @@ SWITCH
 213
 hunting-zone
 hunting-zone
-1
+0
 1
 -1000
 
@@ -1358,6 +1358,13 @@ Polygon -10899396 true false 105 90 75 75 55 75 40 89 31 108 39 124 60 105 75 10
 Polygon -10899396 true false 132 85 134 64 107 51 108 17 150 2 192 18 192 52 169 65 172 87
 Polygon -10899396 true false 85 204 60 233 54 254 72 266 85 252 107 210
 Polygon -7500403 true true 119 75 179 75 209 101 224 135 220 225 175 261 128 261 81 224 74 135 88 99
+
+warning
+false
+0
+Polygon -7500403 true true 0 240 15 270 285 270 300 240 165 15 135 15
+Polygon -16777216 true false 180 75 120 75 135 180 165 180
+Circle -16777216 true false 129 204 42
 
 wheel
 false
