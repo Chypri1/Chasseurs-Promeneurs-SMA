@@ -11,8 +11,6 @@ patches-own [ countdown visit-count]
 promeneurs-own [direction vitesse ]
 
 
-; Déclaration du switch dans l'interface utilisateur :
-; Créez un switch appelé show-energy qui peut être activé ou désactivé.
 to setup
   clear-all
   ifelse netlogo-web? [ set max-sheep 10000 ] [ set max-sheep 30000 ]
@@ -303,7 +301,7 @@ end
 
 
 to move-wolves
-  let closest-sheep min-one-of sheep [distance myself] ; Trouver le mouton le plus proche
+  let closest-sheep min-one-of (sheep in-radius 30) [distance myself] ; Trouver le mouton le plus proche
   let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
 
   ; Chasser le mouton ou se déplacer aléatoirement
@@ -491,8 +489,8 @@ end
 
 to draw-hunting-zone
   let margin 1 ; Taille du décalage pour réduire le cadre
-  let min-size 40 ; Superficie minimale de la zone de chasse
-
+  let min-width 40
+  let min-height 40
   let hunting-zone-valid? false ; Indicateur de validité de la zone
 
   ; Générer une zone valide qui respecte les contraintes de visibilité et de superficie minimale
@@ -514,7 +512,7 @@ to draw-hunting-zone
     let height y-top - y-bottom
 
     ; Vérifier si la superficie respecte la contrainte
-    if (width * height >= min-size) [
+    if (width >= min-width and height >= min-height) [
       ; Mettre à jour les coordonnées globales et marquer comme valide
       set hunting-zone-x1 x-left
       set hunting-zone-y1 y-top
@@ -554,8 +552,6 @@ to add-stop-signs-at-crossings
     ]
   ]
 end
-
-
 
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -609,7 +605,7 @@ sheep-reproduce
 sheep-reproduce
 1.0
 20.0
-6.0
+20.0
 1.0
 1
 %

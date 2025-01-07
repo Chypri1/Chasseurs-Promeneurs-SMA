@@ -11,8 +11,6 @@ patches-own [ countdown visit-count]
 promeneurs-own [direction vitesse ]
 
 
-; Déclaration du switch dans l'interface utilisateur :
-; Créez un switch appelé show-energy qui peut être activé ou désactivé.
 to setup
   clear-all
   ifelse netlogo-web? [ set max-sheep 10000 ] [ set max-sheep 30000 ]
@@ -302,6 +300,50 @@ end
 
 
 
+to move-wolves
+  let closest-sheep min-one-of (sheep in-radius 30) [distance myself] ; Trouver le mouton le plus proche
+  let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
+
+  ; Chasser le mouton ou se déplacer aléatoirement
+  if closest-sheep != nobody [
+    face closest-sheep ; Se diriger vers le mouton le plus proche
+
+    ; Manger le mouton s'il est suffisamment proche
+    if distance closest-sheep < 1 [
+      ask closest-sheep [ die ] ; Le mouton meurt
+      set energy energy + 500 ; Augmenter l'énergie du loup
+    ]
+  ]
+
+  ; Éviter les autres loups s'ils sont trop proches
+  if any? nearby-wolves [
+    let closest-wolf min-one-of nearby-wolves [distance myself] ; Loup le plus proche
+    if closest-wolf != nobody [
+      ; Tourner de 30° dans la direction opposée au loup le plus proche
+      let angle-to-closest-wolf towards closest-wolf
+      rt 30 - (angle-to-closest-wolf - heading) ; Tourner de 30° dans la direction opposée
+    ]
+  ]
+
+  ; Vérifier si le patch sous le loup est rouge
+  ifelse pcolor = red [
+    bk 1 ; Reculer légèrement
+    set heading heading + 180 ; Faire demi-tour
+    fd 1 ; Avancer après demi-tour
+  ]
+  [
+    fd 0.5 ; Sinon avancer normalement
+  ]
+
+  ; Éviter de sortir des limites du monde
+  if pxcor = min-pxcor or pxcor = max-pxcor or pycor = min-pycor or pycor = max-pycor [
+    bk 1
+    set heading heading + 180
+    fd 1
+  ]
+
+  set energy energy - 0.5 ; Réduction de l'énergie à chaque mouvement
+end
 
 
 
@@ -447,8 +489,8 @@ end
 
 to draw-hunting-zone
   let margin 1 ; Taille du décalage pour réduire le cadre
-  let min-size 40 ; Superficie minimale de la zone de chasse
-
+  let min-width 40
+  let min-height 40
   let hunting-zone-valid? false ; Indicateur de validité de la zone
 
   ; Générer une zone valide qui respecte les contraintes de visibilité et de superficie minimale
@@ -470,7 +512,7 @@ to draw-hunting-zone
     let height y-top - y-bottom
 
     ; Vérifier si la superficie respecte la contrainte
-    if (width * height >= min-size) [
+    if (width >= min-width and height >= min-height) [
       ; Mettre à jour les coordonnées globales et marquer comme valide
       set hunting-zone-x1 x-left
       set hunting-zone-y1 y-top
@@ -510,8 +552,6 @@ to add-stop-signs-at-crossings
     ]
   ]
 end
-
-
 
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -565,7 +605,7 @@ sheep-reproduce
 sheep-reproduce
 1.0
 20.0
-6.0
+20.0
 1.0
 1
 %
