@@ -1,4 +1,5 @@
-globals [ max-sheep coordonnees ]
+globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2]
+
 
 breed [ sheep a-sheep ]
 breed [ promeneurs a-promeneur]
@@ -9,9 +10,6 @@ patches-own [ countdown visit-count]
 
 promeneurs-own [direction vitesse ]
 
-
-; Déclaration du switch dans l'interface utilisateur :
-; Créez un switch appelé show-energy qui peut être activé ou désactivé.
 
 to setup
   clear-all
@@ -24,39 +22,42 @@ to setup
     set visit-count 0
   ]
 
-
   create-path  ; Créer le chemin
   show coordonnees
+  draw-hunting-zone  ; Dessiner le cadre rouge
+
+
 
   create-sheep initial-number-sheep [
-    set shape "sheep"
-    set color white
-    set size 1.5
-    set label-color blue - 2
-    set energy random 4000 + 1000
-    setxy random-xcor random-ycor
-    ifelse show-energy = true[
-      set label (round (energy * 100) / 100)
-    ]
-    [
-     set label ""
-    ]
+  set shape "sheep"
+  set color white
+  set size 1.5
+  set label-color blue - 2
+  set energy random 4000 + 1000
+  setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1
+        random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+  ifelse show-energy = true [
+    set label (round (energy * 100) / 100)
+  ] [
+    set label ""
   ]
+]
 
-  create-wolves initial-number-wolf [
-    set shape "wolf"
-    set color black
-    set size 1.5
-    set label-color blue - 2
-    set energy random 4000 + 1000
-    setxy random-xcor random-ycor
-    ifelse show-energy = true[
-      set label (round (energy * 100) / 100)
-    ]
-    [
-     set label ""
-    ]
+create-wolves initial-number-wolf [
+  set shape "wolf"
+  set color black
+  set size 1.5
+  set label-color blue - 2
+  set energy random 4000 + 1000
+  setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1
+        random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+  ifelse show-energy = true [
+    set label (round (energy * 100) / 100)
+  ] [
+    set label ""
   ]
+]
+
 
   create-promeneurs initial-number-promeneurs [
     set shape "person"
@@ -210,6 +211,9 @@ to go
   tick
 end
 
+
+
+
 to move-promeneurs
   ; Récupérer les coordonnées du chemin
   let x1 item 0 item 0 coordonnees
@@ -217,53 +221,40 @@ to move-promeneurs
   let x2 item 0 item 1 coordonnees
   let y2 item 1 item 1 coordonnees
 
-
-  ifelse direction = 0 [
-    ifelse x2 = pxcor and y2 = pycor[
-     set direction 1 - direction
-    ][
-      set heading towardsxy x2 y2
+  ; Vérifier si le promeneur est à côté d'une tortue "stop-sign"
+  ifelse any? turtles-here with [shape = "tree"] [
+    if random-float 1 <= 0.95 [ ; 95 % des cas
+      set direction 1 - direction ; Faire demi-tour
+      fd vitesse * 3 ; Avancer dans la nouvelle direction
+      stop ; Ne pas continuer d'autres actions
     ]
-
-  ]
-   [
-    ifelse x1 = pxcor and y1 = pycor[
-     set direction 1 - direction
-    ][
-       set heading towardsxy x1 y1
+  ][
+    ; Déterminer la direction normale du promeneur
+    ifelse direction = 0 [
+      ifelse x2 = pxcor and y2 = pycor [
+        ; Si le promeneur atteint la fin du chemin, changer de direction
+        set direction 1 - direction
+      ][
+        ; Avancer vers la fin du chemin
+        set heading towardsxy x2 y2
+      ]
+    ] [
+      ifelse x1 = pxcor and y1 = pycor [
+        ; Si le promeneur atteint le début du chemin, changer de direction
+        set direction 1 - direction
+      ][
+      ; Avancer vers le début du chemin
+        set heading towardsxy x1 y1
+      ]
     ]
   ]
 
-  ; Si le mode d'évasion est activé
-  ifelse evade_mode = true [
-    fd 1
-    if pcolor = brown [
-      set evade_mode false  ; Désactiver l'évasion quand on est de nouveau sur le chemin
-    ]
-  ]
-;   Sinon, comportement normal
-  [
-    fd vitesse
-
-;    ; Vérifier si le promeneur est toujours sur le chemin
-;    while [pcolor != brown] [
-;      ; Si le promeneur quitte le chemin, activez le mode d'évasion
-;      ifelse random 1000 < 1 [
-;        set evade_mode true
-;      ]
-;      [
-;        ; Sinon, faire demi-tour et revenir sur le chemin
-;        bk 1
-;        rt random 120
-;        fd 1
-;      ]
-;    ]
-  ]
+  ; Déplacement normal
+  fd vitesse
 
   ; Consommer de l'énergie
   set energy energy - 1
 end
-
 
 
 to move-sheep
@@ -307,8 +298,10 @@ to move-sheep
   set energy energy - 0.5 ; Réduction de l'énergie
 end
 
+
+
 to move-wolves
-  let closest-sheep min-one-of sheep [distance myself] ; Trouver le mouton le plus proche
+  let closest-sheep min-one-of (sheep in-radius 30) [distance myself] ; Trouver le mouton le plus proche
   let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
 
   ; Chasser le mouton ou se déplacer aléatoirement
@@ -332,16 +325,25 @@ to move-wolves
     ]
   ]
 
-  fd 0.5 ; Avancer après le mouvement
+  ; Vérifier si le patch sous le loup est rouge
+  ifelse pcolor = red [
+    bk 1 ; Reculer légèrement
+    set heading heading + 180 ; Faire demi-tour
+    fd 1 ; Avancer après demi-tour
+  ]
+  [
+    fd 0.5 ; Sinon avancer normalement
+  ]
 
+  ; Éviter de sortir des limites du monde
   if pxcor = min-pxcor or pxcor = max-pxcor or pycor = min-pycor or pycor = max-pycor [
     bk 1
     set heading heading + 180
     fd 1
   ]
+
   set energy energy - 0.5 ; Réduction de l'énergie à chaque mouvement
 end
-
 
 
 
@@ -358,6 +360,19 @@ end
 to death
   if energy <= 0 [ die ]
 end
+
+
+
+
+
+;
+;
+;
+;  fonction pour la création du plateau/ de la carte
+;
+;
+;
+
 
 to create-path
   let path-choice random 2 + 1
@@ -471,6 +486,73 @@ to draw-line [x1 y1 x2 y2 path-choice]
     ]
   ]
 end
+
+to draw-hunting-zone
+  let margin 1 ; Taille du décalage pour réduire le cadre
+  let min-width 40
+  let min-height 40
+  let hunting-zone-valid? false ; Indicateur de validité de la zone
+
+  ; Générer une zone valide qui respecte les contraintes de visibilité et de superficie minimale
+  while [not hunting-zone-valid?] [
+    ; Générer des coordonnées aléatoires pour les coins de la zone de chasse (en entiers)
+    let x1 round (random (max-pxcor - margin - min-pxcor - margin)) + min-pxcor + margin
+    let y1 round (random (max-pycor - margin - min-pycor - margin)) + min-pycor + margin
+    let x2 round (random (max-pxcor - margin - min-pxcor - margin)) + min-pxcor + margin
+    let y2 round (random (max-pycor - margin - min-pycor - margin)) + min-pycor + margin
+
+    ; S'assurer que (x1, y1) est en haut à gauche et (x2, y2) en bas à droite
+    let x-left min list x1 x2
+    let x-right max list x1 x2
+    let y-bottom min list y1 y2
+    let y-top max list y1 y2
+
+    ; Calculer la largeur et la hauteur de la zone
+    let width x-right - x-left
+    let height y-top - y-bottom
+
+    ; Vérifier si la superficie respecte la contrainte
+    if (width >= min-width and height >= min-height) [
+      ; Mettre à jour les coordonnées globales et marquer comme valide
+      set hunting-zone-x1 x-left
+      set hunting-zone-y1 y-top
+      set hunting-zone-x2 x-right
+      set hunting-zone-y2 y-bottom
+      set hunting-zone-valid? true
+    ]
+  ]
+
+  ; Tracer les bords de la zone en rouge
+  ask patches [
+    if (pxcor = hunting-zone-x1 and pycor >= hunting-zone-y2 and pycor <= hunting-zone-y1) or ; Bord gauche
+       (pxcor = hunting-zone-x2 and pycor >= hunting-zone-y2 and pycor <= hunting-zone-y1) or ; Bord droit
+       (pycor = hunting-zone-y2 and pxcor >= hunting-zone-x1 and pxcor <= hunting-zone-x2) or ; Bord bas
+       (pycor = hunting-zone-y1 and pxcor >= hunting-zone-x1 and pxcor <= hunting-zone-x2)    ; Bord haut
+    [
+      set pcolor red ; Définir la couleur des bords
+
+    ]
+  ]
+
+ ; je voudrais que si les lignes rouges coupent le chemin marron alors il y a des shapes qui apparaissent à leurs croisement
+  add-stop-signs-at-crossings
+end
+
+to add-stop-signs-at-crossings
+  ; Identifier les patches correspondant aux bords rouges de la zone de chasse
+  ask patches with [pcolor = red] [
+    ; Vérifier si ce patch rouge est aussi sur le chemin marron
+    if pcolor = red and any? neighbors4 with [pcolor = brown] [
+      ; Créer une tortue "panneau stop" à cet emplacement
+      sprout 1 [
+        set shape "tree" ; Assurez-vous que la forme "stop-sign" est définie dans l'interface
+        set size 5 ; Ajuster la taille du panneau si nécessaire
+        set color yellow ; Définir la couleur du panneau
+      ]
+    ]
+  ]
+end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -523,7 +605,7 @@ sheep-reproduce
 sheep-reproduce
 1.0
 20.0
-6.0
+20.0
 1.0
 1
 %
