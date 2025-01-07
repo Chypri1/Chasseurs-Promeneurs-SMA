@@ -1,7 +1,7 @@
 ;;shooting-range ads-time parametre
 
 extensions [sound]
-globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2 shooting-range ads-time]
+globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2]
 
 
 breed [ sheep a-sheep ]
@@ -20,8 +20,7 @@ wolves-own [aiming cible end-coords]
 to setup
   clear-all
   ifelse netlogo-web? [ set max-sheep 10000 ] [ set max-sheep 30000 ]
-  set shooting-range 15
-  set ads-time 10
+
 
   ; Initialisation des patches (fond vert)
   ask patches [
@@ -32,7 +31,7 @@ to setup
 
   create-path  ; Créer le chemin
   show coordonnees
-  if zone-de-chasse[
+  if hunting-zone[
       draw-hunting-zone  ; Dessiner le cadre rouge
   ]
 
@@ -78,7 +77,7 @@ to setup
     set energy random 4000 + 1000
     set aiming 0
     set cible sheep
-    ;set random-xcor random-ycor
+    setxy random-xcor random-ycor
     if hunting-zone[
       ifelse (hunting-zone-x2 - hunting-zone-x1) >= (hunting-zone-y1 - hunting-zone-y2)[
         setxy hunt-start-x random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
@@ -93,6 +92,7 @@ to setup
      set label ""
     ]
   ]
+
   ask wolves[
     create-links-with sheep[
       set color red
@@ -102,31 +102,6 @@ to setup
 
 
 
-  create-wolves initial-number-wolf [
-    set shape "wolf"
-    set color black
-    set size 1.5
-    set label-color blue - 2
-    set energy random 4000 + 1000
-    set aiming 0
-    set cible sheep
-    setxy random-xcor random-ycor
-    if zone-de-chasse[
-    setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1 random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
-    ]
-    ifelse show-energy = true[
-      set label (round (energy * 100) / 100)
-    ]
-    [
-     set label ""
-    ]
-  ]
-  ask wolves[
-    create-links-with sheep[
-      set color red
-      hide-link
-    ]
-  ]
 
   create-promeneurs initial-number-promeneurs [
     set shape "person"
@@ -721,7 +696,6 @@ to play-sound-boar ;
   ;sound:play-sound "Le sanglier.mp3"
   sound:play-sound "./sound/Le-sanglier.wav"
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -830,10 +804,10 @@ count sheep
 11
 
 SWITCH
-205
-265
-322
-298
+0
+220
+117
+253
 show-energy
 show-energy
 1
@@ -882,16 +856,45 @@ NIL
 HORIZONTAL
 
 SWITCH
-205
-225
-332
-258
-hunting-zone
-hunting-zone
 0
-
+180
+142
+213
+hunting-zone
+hunting-zone
+1
 1
 -1000
+
+SLIDER
+0
+255
+172
+288
+shooting-range
+shooting-range
+0
+100
+15.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+175
+255
+347
+288
+ads-time
+ads-time
+0
+100
+10.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## Qu'est ce que c'est 
