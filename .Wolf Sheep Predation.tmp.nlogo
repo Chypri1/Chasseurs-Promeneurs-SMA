@@ -1,4 +1,5 @@
-globals [ max-sheep coordonnees ]
+;;shooting-range ads-time parametre
+globals [ max-sheep coordonnees shooting-range ads-time]
 
 breed [ sheep a-sheep ]
 breed [ promeneurs a-promeneur]
@@ -9,6 +10,8 @@ patches-own [ countdown visit-count]
 
 promeneurs-own [direction vitesse ]
 
+wolves-own [aiming cible]
+
 
 ; Déclaration du switch dans l'interface utilisateur :
 ; Créez un switch appelé show-energy qui peut être activé ou désactivé.
@@ -16,6 +19,8 @@ promeneurs-own [direction vitesse ]
 to setup
   clear-all
   ifelse netlogo-web? [ set max-sheep 10000 ] [ set max-sheep 30000 ]
+  set shooting-range 15
+  set ads-time 10
 
   ; Initialisation des patches (fond vert)
   ask patches [
@@ -49,6 +54,8 @@ to setup
     set size 1.5
     set label-color blue - 2
     set energy random 4000 + 1000
+    set aiming 0
+    set cible sheep
     setxy random-xcor random-ycor
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
@@ -57,7 +64,12 @@ to setup
      set label ""
     ]
   ]
-
+  ask wolves[
+    create-links-with sheep[
+      set color red
+      hide-link
+    ]
+  ]
   create-promeneurs initial-number-promeneurs [
     set shape "person"
     set color blue
@@ -93,7 +105,7 @@ end
 
 
 to go
-  if not any? turtles [ stop ]
+  if not any? sheep [ stop ]
 
   ; Vérifier si un nouveau promeneur doit être ajouté
   if ticks mod 500 = 0 [
@@ -307,6 +319,72 @@ to move-sheep
   set energy energy - 0.5 ; Réduction de l'énergie
 end
 
+to-report is-los-clear? [radius]
+  ;; Initialiser une liste pour les agents détectés
+  let los-clear true
+  let cibles []
+  let cibles-set sort turtles in-radius radius with [self != myself and not is-a-sheep? self]
+  set cibles cibles-set
+  ;; Examiner chaque tortue dans le rayon, en excluant la tortue appelante
+  foreach cibles [t ->
+    show cibles
+    ;let me-self myself
+    ;; Obtenir une référence explicite à l'agent appelant
+    ;; Calculer l'angle relatif entre l'agent actuel et l'agent appelant
+    let relative-angle subtract-headings (towards t) heading
+
+    ;; Vérifier si l'agent est dans l'arc spécifié
+    ;show "angles"
+    ;show is-a-sheep? self
+    ;show relative-angle
+    ;show abs relative-angle + 60
+    ;if is-a-sheep? = false[
+    if (relative-angle >= 0 and relative-angle - 60 <= 0) or (relative-angle <= 0 and relative-angle + 60 >= 0)[
+        ;; La ligne de tir n'est pas dégagée
+        ;;ask me-self [
+        ;;set los-clear lput self los-clear
+        ;;]
+        ;; Marquer visuellement les agents détectés
+      show t
+      show relative-angle
+      report false
+
+    ]
+    ;]
+  ]
+
+  ;; Afficher la liste des agents détectés par l'agent appelant
+  ;show word "Tir possible : " los-clear
+  report true
+end
+
+to-report shoot-hit?
+  let x1 xcor
+  let y1 ycor
+  let x2 [xcor] of cible
+  let y2 [ycor] of cible
+  let absx abs (x2 - x1)
+  let absy abs (y2 - y1)
+  let steps max list absx absy ;; Nombre d'étapes nécessaires pour tracer la ligne
+
+  ;; Diviser le segment en petites étapes
+  let x-step (x2 - x1) / steps
+  let y-step (y2 - y1) / steps
+
+  ;; Vérifier chaque patch traversé
+  let target-color green
+  foreach range steps [i ->
+    ;show i
+    let x (x1 + x-step * i)
+    let y (y1 + y-step * i)
+    if [pcolor] of patch (round x) (round y) = target-color [
+      ;show (word "Patch " target-color " trouvé à (" round x ", " round y ")")
+
+    ]
+  ]
+  report true
+end
+
 to move-wolves
   let closest-sheep min-one-of sheep [distance myself] ; Trouver le mouton le plus proche
   let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
@@ -315,13 +393,49 @@ to move-wolves
   if closest-sheep != nobody [
     face closest-sheep ; Se diriger vers le mouton le plus proche
 
-
     ; Manger le mouton s'il est suffisamment proche
-    if distance closest-sheep < 1 [
-      ask closest-sheep [ die ] ; Le mouton meurt
-      set energy energy + 500 ; Augmenter l'énergie du loup
+    if distance closest-sheep < shooting-range [
+
+      ifelse aiming = 0 [
+        ; Mise en joue
+        set cible closest-sheep
+        face cible
+        ask cible [
+          set color blue
+        ]
+        set aiming ticks
+        ; print "Début aiming"
+        ; print ticks
+      ][
+        ifelse not is-agent? cible[
+          set aiming 0
+        ][
+          face cible
+          ifelse is-los-clear? (shooting-range * 2) = true[
+            if distance cible <= shooting-range[
+              ; Mise en joue terminée, la cible est-elle toujours à portée?
+              if ticks > aiming + ads-time[
+                ; Cible toujours à portée
+                if shoot-hit?[
+                  ask link-with cible[
+                    show-link
+                  ]
+                  display
+                  wait 1
+                  ask cible [ die ]  ; Manger le mouton
+                  set energy energy + 500    ; Augmenter l'énergie
+                ]
+              ]
+            ]
+          ][
+            ask cible [ set color white]
+            set aiming 0
+          ]
+        ]
+      ]
     ]
   ]
+
 
   ; Éviter les autres loups s'ils sont trop proches
   if any? nearby-wolves [
@@ -335,6 +449,11 @@ to move-wolves
 
   fd 0.5 ; Avancer après le mouvement
 
+  if pxcor = min-pxcor or pxcor = max-pxcor or pycor = min-pycor or pycor = max-pycor [
+    bk 1
+    set heading heading + 180
+    fd 1
+  ]
   set energy energy - 0.5 ; Réduction de l'énergie à chaque mouvement
 end
 
@@ -471,11 +590,11 @@ end
 GRAPHICS-WINDOW
 355
 10
-1167
-823
+1089
+745
 -1
 -1
-4.0
+6.0
 1
 14
 1
@@ -485,10 +604,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--100
-100
--100
-100
+-60
+60
+-60
+60
 1
 1
 1
@@ -503,8 +622,8 @@ SLIDER
 initial-number-sheep
 initial-number-sheep
 0
-25
-8.0
+100
+53.0
 1
 1
 NIL
@@ -645,7 +764,7 @@ initial-number-wolf
 initial-number-wolf
 0
 100
-15.0
+20.0
 1
 1
 NIL
