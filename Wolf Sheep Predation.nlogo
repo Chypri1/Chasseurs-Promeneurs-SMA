@@ -402,7 +402,7 @@ to-report shoot-hit?
 end
 
 to move-wolves
-  let closest-sheep min-one-of (sheep in-radius 30) [distance myself] ; Trouver le mouton le plus proche
+  let closest-sheep min-one-of (sheep in-radius vision-range) [distance myself] ; Trouver le mouton le plus proche
   let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
 
   ; Chasser le mouton ou se déplacer aléatoirement
@@ -775,9 +775,9 @@ NIL
 
 PLOT
 10
-360
+435
 350
-530
+605
 populations
 time
 pop.
@@ -789,14 +789,15 @@ true
 true
 "" ""
 PENS
-"sheep" 1.0 0 -612749 true "" "plot count sheep"
+"lapins" 1.0 0 -612749 true "" "plot count sheep"
 "promeneurs" 1.0 0 -2674135 true "" "plot count promeneurs"
+"chasseurs" 1.0 0 -7500403 true "" "plot count wolves"
 
 MONITOR
-41
-308
-111
-353
+185
+380
+255
+425
 sheep
 count sheep
 3
@@ -830,10 +831,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-135
-305
-212
-350
+270
+380
+347
+425
 promeneurs
 count promeneurs
 17
@@ -882,15 +883,49 @@ NIL
 HORIZONTAL
 
 SLIDER
-175
-255
-347
-288
+0
+295
+172
+328
 ads-time
 ads-time
 0
 100
+15.0
+1
+1
+NIL
+HORIZONTAL
+
+PLOT
+15
+620
+350
+770
+mise en joue
+NIL
+NIL
+0.0
 10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"mort de lapins" 1.0 0 -16777216 true "" "plot count wolves "
+"mise en joue" 1.0 0 -2674135 true "" ""
+
+SLIDER
+0
+330
+172
+363
+vision-range
+vision-range
+0
+100
+24.0
 1
 1
 NIL
