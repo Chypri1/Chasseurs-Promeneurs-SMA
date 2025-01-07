@@ -1,4 +1,5 @@
 ;;shooting-range ads-time parametre
+extensions [sound]
 globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2 shooting-range ads-time]
 
 
@@ -29,7 +30,10 @@ to setup
 
   create-path  ; Créer le chemin
   show coordonnees
-  draw-hunting-zone  ; Dessiner le cadre rouge
+  if zone-de-chasse[
+      draw-hunting-zone  ; Dessiner le cadre rouge
+  ]
+
 
 
 
@@ -39,12 +43,15 @@ to setup
   set size 1.5
   set label-color blue - 2
   set energy random 4000 + 1000
-  setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1
-        random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+  setxy random-xcor random-ycor
+  if zone-de-chasse[
+    setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1 random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+  ]
   ifelse show-energy = true [
     set label (round (energy * 100) / 100)
   ] [
     set label ""
+  ]
   ]
 
 
@@ -57,7 +64,9 @@ to setup
     set aiming 0
     set cible sheep
     setxy random-xcor random-ycor
+    if zone-de-chasse[
     setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1 random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+    ]
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
     ]
@@ -413,6 +422,7 @@ to move-wolves
                     show-link
                   ]
                   display
+                  play-sound-boar
                   wait 1
                   ask cible [ die ]  ; Manger le mouton
                   set energy energy + 500    ; Augmenter l'énergie
@@ -666,6 +676,11 @@ to add-stop-signs-at-crossings
   ]
 end
 
+
+to play-sound-boar ;
+  ;sound:play-sound "Le sanglier.mp3"
+  sound:play-sound "./sound/Le-sanglier.wav"
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -788,16 +803,6 @@ count sheep
 1
 11
 
-TEXTBOX
-10
-210
-150
-228
-Sheep settings
-11
-0.0
-0
-
 SWITCH
 205
 265
@@ -850,6 +855,17 @@ initial-number-wolf
 NIL
 HORIZONTAL
 
+SWITCH
+190
+200
+347
+233
+zone-de-chasse
+zone-de-chasse
+1
+1
+-1000
+
 @#$#@#$#@
 ## Qu'est ce que c'est 
 
@@ -874,9 +890,16 @@ Il y a deux principales utilisations à ce modèle.
 
 Le premier avec la zone de chasse permet de définir une zone dans laquelle les chasseurs doivent resté mais pas les proies et donc une zone restrainte seulement pour les prédateurs.En plus de cela et de facon aléatoire un chemin pédestre peut la traverser pour simuler le comportement des chasseurs dans la cas, certes rare, où des promeneurs l'emprunteraient dans la cas ou ils n'auraient pas vu ou pas tenu compte des panneaux normalement censé se situer à l'entrée d'une zone de chasse qui coupent un sentier. 
 
-Le second sans la zone de chasse permet de zoomer sur une zone de chasse plus grande où dans ce cas précis les animaux ne pourraient pas non plus s'échapper. Cela peut être le cas dans des zones grillagées près de grands axes comme des autoroutes ou nationales à 110km/h.
+Le second sans la zone de chasse permet de zoomer sur une zone de chasse plus grande où dans ce cas précis les animaux ne pourraient pas non plus s'échapper. Cela peut être le cas dans des zones grillagées.
 Dans ce cas, les prédateurs et les proies restent dans la même zone et seul le temps permet de finir la partie de chasse.
-Des promeneurs sont aussi présent dans la zone de chasse 
+Des promeneurs sont aussi présent dans la zone de chasse.
+
+#### génération du chemin
+Pour générer notre chemin, nous utilisons l'algorithme de tracé de segment de Bresenham. Le principe est de définir deux points et de les relier entre puis de vérifier les patches qui sont parcourus pour les colorier. 
+
+#### génération des panneauxs
+En ce qui concerne les panneaux, ils sont générés dans le cas où la zone de chasse, qui est généré aléatoirement, vient croiser le chemin. Dans ce cas précis, les panneaux s'affichent de telle sorte que les panneaux suivent la limite de la zone de chasse sur les patches marrons du chemin. 
+
 
 ## Comment l'utiliser
 
@@ -885,46 +908,64 @@ Des promeneurs sont aussi présent dans la zone de chasse
 3. appuyer sur SETUP.
 4. Appuyer sur GO et regarder la simulation.
 5. regarder les différentes courbes au cours du temps. 
+6. La simulation s'arrête après que les moutons sont tous mort.
 
-Paramètres:
+### Paramètres:
 
-## ajouter les paramètres
-
-
-Notes:
-- one unit of energy is deducted for every step a wolf takes
-- when running the sheep-wolves-grass model version, one unit of energy is deducted for every step a sheep takes
-
-There are three monitors to show the populations of the wolves, sheep and grass and a populations plot to display the population values over time.
-
-If there are no wolves left and too many sheep, the model run stops.
+- vision-range (distance de vue) à ajouter 
+- shooting-range (distance de tir) ajouté
+- ads-time (aim down sight, temps de mise en joue) ajouté
+- initial-number-promeneurs (nombre de promeneurs au début) ajouté 
+- initial-number-sheep (nombre de mouton/proie au début) ajouté
+- initial-number-wolf (nombre de loups/chasseur au début) ajouté
+- zone-de-chasse (visualisation d'une zone de chasse) à ajouter 
 
 
-## THINGS TO TRY
 
-Try adjusting the parameters under various settings. How sensitive is the stability of the model to the particular parameters?
+### Notes:
 
-Can you find any parameters that generate a stable ecosystem in the sheep-wolves model variation?
+différents graphes de populations:
 
-Try running the sheep-wolves-grass model variation, but setting INITIAL-NUMBER-WOLVES to 0. This gives a stable ecosystem with only sheep and grass. Why might this be stable while the variation with only sheep and wolves is not?
+graphes du nombre de fois ou il vise et il arrete :
+- nombre de fois ou il arrete à cause d'un animal trop loin
+- nombre de fois ou il arrete à cause d'un chasseur/promeneur
 
-Notice that under stable settings, the populations tend to fluctuate at a predictable pace. Can you find any parameters that will speed this up or slow it down?
+ 
 
-## EXTENDING THE MODEL
 
-There are a number of ways to alter the model so that it will be stable with only wolves and sheep (no grass). Some will require new elements to be coded in or existing behaviors to be changed. Can you develop such a version?
+## Choses à essayer
 
-Try changing the reproduction rules -- for example, what would happen if reproduction depended on energy rather than being determined by a fixed probability?
+Faire varier les différents paramètres pour tester de meilleure configuration. 
 
-Can you modify the model so the sheep will flock?
+Par exemple, ajuster la distance de vision plus loin que la distance de tir.
 
-Can you modify the model so that wolves actively chase sheep?
+## Sources
 
-## NETLOGO FEATURES
+### Réglementation chasse
+source: Fédération des Chasseurs Français
+#### Saison de chasse: 
+ouverture: 1er -> 4ème dimanche de Septembre selon dpt
+fermeture: dernier jour de février
+Chaque jour de 1h avant le lever du soleil à 1h après son coucher
 
-Note the use of breeds to model two different kinds of "turtles": wolves and sheep. Note the use of patches to model grass.
+#### Consigne de sécurité (OFB):
+Chasse interdite dans un rayon de 150m autour de toute habitation.
+Usage d’armes à feu interdit sur routes et chemins publics, voies ferrées ainsi que emprises et enclos en dépendant.
+Interdiction de tirer en direction ou au-dessus des zones citées plus tôt si elles sont à portée de tir. 
+Pas de tir en direction de lignes de transports électriques et leurs supports.
+Interdiction de tir en direction de stades, lieux de réunion publiques, habitations particulières(y compris caravanes, abris et remises)
+Port d’un vêtement réglementaire pour toute personne participant à l’acte de chasse
+Signalisation aux entrées principales des zones de chasse
+	Arme cassée et vide en cas d’approche
 
-Note the use of the ONE-OF agentset reporter to select a random sheep to be eaten by a wolf.
+#### Consignes de sécurité en promenade :
+Si coup de fusil entendu, essayer de “modifier l’itineraire”
+Éviter promenade hors sentier/chemin
+Prévenir la battue si elle est rencontrée
+Être visible (vétements de couleur, rester à découvert)
+
+
+(Site du sénat)
 @#$#@#$#@
 default
 true
