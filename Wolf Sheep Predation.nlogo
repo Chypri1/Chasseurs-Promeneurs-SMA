@@ -1,4 +1,5 @@
 ;;shooting-range ads-time parametre
+
 extensions [sound]
 globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2 shooting-range ads-time]
 
@@ -12,7 +13,8 @@ patches-own [ countdown visit-count]
 
 promeneurs-own [direction vitesse ]
 
-wolves-own [aiming cible]
+wolves-own [aiming cible end-coords]
+
 
 
 to setup
@@ -35,24 +37,69 @@ to setup
   ]
 
 
+  let hunt-start-x 0
+  let hunt-start-y 0
+  ifelse random 2 = 0 [
+    set hunt-start-x hunting-zone-x1 + 5
+  ][
+    set hunt-start-x hunting-zone-x2 - 5
+  ]
+
+  ifelse random 2 = 0 [
+    set hunt-start-y hunting-zone-y1 - 5
+  ][
+    set hunt-start-y hunting-zone-y2 + 5
+  ]
 
 
   create-sheep initial-number-sheep [
-  set shape "sheep"
-  set color white
-  set size 1.5
-  set label-color blue - 2
-  set energy random 4000 + 1000
-  setxy random-xcor random-ycor
-  if zone-de-chasse[
-    setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1 random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+    set shape "rabbit"
+    set color white
+    set size 3
+    set label-color blue - 2
+    set energy random 4000 + 1000
+    setxy random-xcor random-ycor
+    if hunting-zone[
+      setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1 random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+    ]
+    ifelse show-energy = true [
+      set label (round (energy * 100) / 100)
+    ] [
+      set label ""
+    ]
   ]
-  ifelse show-energy = true [
-    set label (round (energy * 100) / 100)
-  ] [
-    set label ""
+
+
+  create-wolves initial-number-wolf [
+    set shape "person lumberjack"
+    set color black
+    set size 5
+    set label-color blue - 2
+    set energy random 4000 + 1000
+    set aiming 0
+    set cible sheep
+    ;set random-xcor random-ycor
+    if hunting-zone[
+      ifelse (hunting-zone-x2 - hunting-zone-x1) >= (hunting-zone-y1 - hunting-zone-y2)[
+        setxy hunt-start-x random-float (hunting-zone-y2 - hunting-zone-y1) + hunting-zone-y1
+      ][
+        setxy random-float (hunting-zone-x2 - hunting-zone-x1) + hunting-zone-x1 hunt-start-y
+    ]
+    ]
+    ifelse show-energy = true[
+      set label (round (energy * 100) / 100)
+    ]
+    [
+     set label ""
+    ]
   ]
+  ask wolves[
+    create-links-with sheep[
+      set color red
+      hide-link
+    ]
   ]
+
 
 
   create-wolves initial-number-wolf [
@@ -84,7 +131,7 @@ to setup
   create-promeneurs initial-number-promeneurs [
     set shape "person"
     set color blue
-    set size 2
+    set size 5
     set energy random 4000 + 1000
     set direction random 2
     set vitesse precision (0.2 + random-float 0.4) 2
@@ -143,14 +190,12 @@ to go
         ; Afficher l'énergie si nécessaire
         ifelse show-energy = true [
           set label (round (energy * 100) / 100)
-        ]
-        [
+        ][
           set label ""
         ]
-    ]
-    ]
-    [
-    create-promeneurs 1 [
+      ]
+    ][
+      create-promeneurs 1 [
         set shape "person"
         set color blue
         set size 2
@@ -165,19 +210,17 @@ to go
         ; Placer la tortue sur la première ou la deuxième coordonnée
         ifelse direction = 0 [
           setxy x1 y1
-        ]
-        [
+        ][
           setxy x2 y2
         ]
         ; Afficher l'énergie si nécessaire
         ifelse show-energy = true [
           set label (round (energy * 100) / 100)
-        ]
-        [
+        ][
           set label ""
         ]
+      ]
     ]
-  ]
   ]
 
   ask sheep [
@@ -185,8 +228,7 @@ to go
     death
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
-    ]
-    [
+    ][
       set label ""
     ]
   ]
@@ -196,8 +238,7 @@ to go
     death
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
-    ]
-    [
+    ][
       set label ""
     ]
   ]
@@ -207,26 +248,25 @@ to go
     death
     ifelse show-energy = true[
       set label (round (energy * 100) / 100)
-    ]
-    [
-     set label ""
+    ][
+      set label ""
     ]
   ]
 
   ; Logique de repousse de l'herbe
   ask patches [
-;    if pcolor = brown [
-;      set countdown countdown - 1
-;      if countdown <= 0 [
-;        set pcolor green
-;      ]
-;    ]
+    ;    if pcolor = brown [
+    ;      set countdown countdown - 1
+    ;      if countdown <= 0 [
+    ;        set pcolor green
+    ;      ]
+    ;    ]
     let x1 item 0 item 0 coordonnees
     let y1 item 1 item 0 coordonnees
     let x2 item 0 item 1 coordonnees
     let y2 item 1 item 1 coordonnees
     if (pxcor = x1 and pycor = y1) or (pxcor = x2 and pycor = y2)[
-     set pcolor black
+      set pcolor black
     ]
   ]
 
@@ -244,7 +284,7 @@ to move-promeneurs
   let y2 item 1 item 1 coordonnees
 
   ; Vérifier si le promeneur est à côté d'une tortue "stop-sign"
-  ifelse any? turtles-here with [shape = "tree"] [
+  ifelse any? turtles-here with [shape = "warning"] [
     if random-float 1 <= 0.95 [ ; 95 % des cas
       set direction 1 - direction ; Faire demi-tour
       fd vitesse * 3 ; Avancer dans la nouvelle direction
@@ -260,12 +300,12 @@ to move-promeneurs
         ; Avancer vers la fin du chemin
         set heading towardsxy x2 y2
       ]
-    ] [
+    ][
       ifelse x1 = pxcor and y1 = pycor [
         ; Si le promeneur atteint le début du chemin, changer de direction
         set direction 1 - direction
       ][
-      ; Avancer vers le début du chemin
+        ; Avancer vers le début du chemin
         set heading towardsxy x1 y1
       ]
     ]
@@ -496,7 +536,7 @@ end
 ;
 ;
 
-
+; Création du chemin
 to create-path
   let path-choice random 2 + 1
 
@@ -538,6 +578,7 @@ to create-path
   draw-line x1 y1 x2 y2 path-choice
 end
 
+; Traçage du chemin avec l'algorithme de tracé de segment de Bresenham
 to draw-line [x1 y1 x2 y2 path-choice]
   let deltaX abs (x2 - x1)
   let deltaY abs (y2 - y1)
@@ -676,11 +717,11 @@ to add-stop-signs-at-crossings
   ]
 end
 
-
 to play-sound-boar ;
   ;sound:play-sound "Le sanglier.mp3"
   sound:play-sound "./sound/Le-sanglier.wav"
 end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 355
@@ -722,21 +763,6 @@ initial-number-sheep
 1
 1
 NIL
-HORIZONTAL
-
-SLIDER
-5
-231
-179
-264
-sheep-reproduce
-sheep-reproduce
-1.0
-20.0
-20.0
-1.0
-1
-%
 HORIZONTAL
 
 BUTTON
@@ -856,13 +882,14 @@ NIL
 HORIZONTAL
 
 SWITCH
-190
-200
-347
-233
-zone-de-chasse
-zone-de-chasse
-1
+205
+225
+332
+258
+hunting-zone
+hunting-zone
+0
+
 1
 -1000
 
@@ -1147,6 +1174,35 @@ Rectangle -7500403 true true 127 79 172 94
 Polygon -7500403 true true 195 90 240 150 225 180 165 105
 Polygon -7500403 true true 105 90 60 150 75 180 135 105
 
+person lumberjack
+false
+0
+Polygon -7500403 true true 105 90 120 195 90 285 105 300 135 300 150 225 165 300 195 300 210 285 180 195 195 90
+Polygon -1184463 true false 60 196 90 211 114 155 120 196 180 196 187 158 210 211 240 196 195 91 165 91 150 106 150 135 135 91 105 91
+Circle -7500403 true true 110 5 80
+Rectangle -7500403 true true 127 79 172 94
+Polygon -6459832 true false 174 90 181 90 180 195 165 195
+Polygon -10899396 true false 180 195 120 195 90 285 105 300 135 300 150 225 165 300 195 300 210 285
+Polygon -6459832 true false 126 90 119 90 120 195 135 195
+Rectangle -6459832 true false 45 180 255 195
+Polygon -16777216 true false 270 180 210 165 210 180 90 180 90 195 210 195 240 195 270 195
+Line -16777216 false 135 165 165 165
+Line -16777216 false 135 135 165 135
+Line -16777216 false 90 135 120 135
+Line -16777216 false 105 120 120 120
+Line -16777216 false 180 120 195 120
+Line -16777216 false 180 135 210 135
+Line -16777216 false 90 150 105 165
+Line -16777216 false 225 165 210 180
+Line -16777216 false 75 165 90 180
+Line -16777216 false 210 150 195 165
+Line -16777216 false 180 105 210 180
+Line -16777216 false 120 105 90 180
+Line -16777216 false 150 135 150 165
+Polygon -6459832 true false 100 30 104 44 189 24 185 10 173 10 166 1 138 -1 111 3 109 28
+Polygon -6459832 true false 45 180 30 165 0 165 15 180 15 195 0 210 30 210 45 195 45 180
+Polygon -16777216 false false 60 180 60 180 60 195 75 210 75 180 60 180 60 210
+
 plant
 false
 0
@@ -1158,6 +1214,24 @@ Polygon -7500403 true true 165 180 165 210 225 180 255 120 210 135
 Polygon -7500403 true true 135 105 90 60 45 45 75 105 135 135
 Polygon -7500403 true true 165 105 165 135 225 105 255 45 210 60
 Polygon -7500403 true true 135 90 120 45 150 15 180 45 165 90
+
+rabbit
+false
+0
+Polygon -7500403 true true 61 150 76 180 91 195 103 214 91 240 76 255 61 270 76 270 106 255 132 209 151 210 181 210 211 240 196 255 181 255 166 247 151 255 166 270 211 270 241 255 240 210 270 225 285 165 256 135 226 105 166 90 91 105
+Polygon -7500403 true true 75 164 94 104 70 82 45 89 19 104 4 149 19 164 37 162 59 153
+Polygon -7500403 true true 64 98 96 87 138 26 130 15 97 36 54 86
+Polygon -7500403 true true 49 89 57 47 78 4 89 20 70 88
+Circle -16777216 true false 37 103 16
+Line -16777216 false 44 150 104 150
+Line -16777216 false 39 158 84 175
+Line -16777216 false 29 159 57 195
+Polygon -5825686 true false 0 150 15 165 15 150
+Polygon -5825686 true false 76 90 97 47 130 32
+Line -16777216 false 180 210 165 180
+Line -16777216 false 165 180 180 165
+Line -16777216 false 180 165 225 165
+Line -16777216 false 180 210 210 240
 
 sheep
 false
