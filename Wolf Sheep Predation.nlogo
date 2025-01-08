@@ -1,7 +1,7 @@
 ;;shooting-range ads-time parametre
 
 extensions [sound]
-globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2]
+globals [ max-sheep coordonnees hunting-zone-x1 hunting-zone-y1 hunting-zone-x2 hunting-zone-y2 nb-ads nb-failed-ads-agent nb-failed-ads-range]
 
 
 breed [ sheep a-sheep ]
@@ -13,7 +13,7 @@ patches-own [ countdown visit-count]
 
 promeneurs-own [direction vitesse ]
 
-wolves-own [aiming cible end-coords]
+wolves-own [aiming cible nb-hunts]
 
 
 
@@ -146,7 +146,7 @@ to go
       create-promeneurs 100 [
         set shape "person"
         set color blue
-        set size 2
+        set size 5
         set energy random 4000 + 1000
         set direction random 2
         set vitesse precision (0.2 + random-float 0.3) 1
@@ -335,6 +335,7 @@ to move-sheep
   set energy energy - 0.5 ; Réduction de l'énergie
 end
 
+; Vérifier si la règle des 30° est respectée
 to-report is-los-clear? [radius]
   ;; Initialiser une liste pour les agents détectés
   let los-clear true
@@ -343,26 +344,14 @@ to-report is-los-clear? [radius]
   set cibles cibles-set
   ;; Examiner chaque tortue dans le rayon, en excluant la tortue appelante
   foreach cibles [t ->
-    ;show cibles
-    ;let me-self myself
     ;; Obtenir une référence explicite à l'agent appelant
     ;; Calculer l'angle relatif entre l'agent actuel et l'agent appelant
     let relative-angle subtract-headings (towards t) heading
 
     ;; Vérifier si l'agent est dans l'arc spécifié
-    ;show "angles"
-    ;show is-a-sheep? self
-    ;show relative-angle
-    ;show abs relative-angle + 60
-    ;if is-a-sheep? = false[
     if (relative-angle >= 0 and relative-angle - 60 <= 0) or (relative-angle <= 0 and relative-angle + 60 >= 0)[
         ;; La ligne de tir n'est pas dégagée
-        ;;ask me-self [
-        ;;set los-clear lput self los-clear
-        ;;]
-        ;; Marquer visuellement les agents détectés
-      ;show t
-      ;show relative-angle
+      set nb-failed-ads-agent nb-failed-ads-agent + 1
       report false
 
     ]
@@ -374,6 +363,7 @@ to-report is-los-clear? [radius]
   report true
 end
 
+; Vérifier si un obstacle obstrue le parcours du projectile
 to-report shoot-hit?
   let x1 xcor
   let y1 ycor
@@ -405,11 +395,11 @@ to move-wolves
   let closest-sheep min-one-of (sheep in-radius vision-range) [distance myself] ; Trouver le mouton le plus proche
   let nearby-wolves other wolves in-radius 2 ; Loups proches dans un rayon de 2 unités, sauf soi-même
 
-  ; Chasser le mouton ou se déplacer aléatoirement
+  ; Chasser la proie ou se déplacer
   if closest-sheep != nobody [
     face closest-sheep ; Se diriger vers le mouton le plus proche
 
-    ; Manger le mouton s'il est suffisamment proche
+    ; Cibler la proie si elle est suffisamment proche
     if distance closest-sheep < shooting-range [
 
       ifelse aiming = 0 [
@@ -419,16 +409,17 @@ to move-wolves
         ask cible [
           set color blue
         ]
+        set nb-ads nb-ads + 1
+        ; enregistrer le début de la visée
         set aiming ticks
-        ; print "Début aiming"
-        ; print ticks
       ][
+        ; vérifier si la cible est toujours en vie
         ifelse not is-agent? cible[
           set aiming 0
         ][
           face cible
           ifelse is-los-clear? (shooting-range * 2) = true[
-            if distance cible <= shooting-range[
+            ifelse distance cible <= shooting-range[
               ; Mise en joue terminée, la cible est-elle toujours à portée?
               if ticks > aiming + ads-time[
                 ; Cible toujours à portée
@@ -440,9 +431,12 @@ to move-wolves
                   play-sound-boar
                   wait 1
                   ask cible [ die ]  ; Manger le mouton
+                  set nb-hunts nb-hunts + 1
                   set energy energy + 500    ; Augmenter l'énergie
                 ]
               ]
+            ][
+              set nb-failed-ads-range nb-failed-ads-range + 1
             ]
           ][
             ask cible [ set color white]
@@ -455,8 +449,8 @@ to move-wolves
 
   ; Éviter les autres loups s'ils sont trop proches
   if any? nearby-wolves [
-    let closest-wolf min-one-of nearby-wolves [distance myself] ; Loup le plus proche
-    if closest-wolf != nobody [
+    let closest-wolf min-one-of nearby-wolves [distance myself] ;Loup le plus proche
+    if closest-wolf != nobody[
       ; Tourner de 30° dans la direction opposée au loup le plus proche
       let angle-to-closest-wolf towards closest-wolf
       rt 30 - (angle-to-closest-wolf - heading) ; Tourner de 30° dans la direction opposée
@@ -733,7 +727,7 @@ initial-number-sheep
 initial-number-sheep
 0
 25
-8.0
+23.0
 1
 1
 NIL
@@ -850,7 +844,7 @@ initial-number-wolf
 initial-number-wolf
 0
 100
-15.0
+8.0
 1
 1
 NIL
@@ -863,7 +857,7 @@ SWITCH
 213
 hunting-zone
 hunting-zone
-0
+1
 1
 -1000
 
@@ -913,8 +907,10 @@ true
 true
 "" ""
 PENS
-"mort de lapins" 1.0 0 -16777216 true "" "plot count wolves "
-"mise en joue" 1.0 0 -2674135 true "" ""
+"meilleur score" 1.0 0 -16777216 true "" "ask max-one-of wolves[nb-hunts][plot nb-hunts]"
+"mises en joue initiées" 1.0 0 -2674135 true "" "plot nb-ads"
+"Agent dans la ligne de tir" 1.0 0 -8630108 true "" "plot nb-failed-ads-agent"
+"Proie hors de portée" 1.0 0 -13345367 true "" "plot nb-failed-ads-range"
 
 SLIDER
 0
@@ -1006,8 +1002,6 @@ Par exemple, ajuster la distance de vision plus loin que la distance de tir.
 
 ## Sources
 
-### Réglementation chasse
-source: Fédération des Chasseurs Français
 #### Saison de chasse: 
 ouverture: 1er -> 4ème dimanche de Septembre selon département
 fermeture: dernier jour de février
@@ -1030,7 +1024,7 @@ Si coup de fusil entendu, essayer de “modifier l’itineraire”
 Prévenir la battue si elle est rencontrée
 Être visible (vétements de couleur, rester à découvert)
 
-
+(Fédération nationale de la chasse)
 (Site du sénat)
 @#$#@#$#@
 default
@@ -1358,13 +1352,6 @@ Polygon -10899396 true false 105 90 75 75 55 75 40 89 31 108 39 124 60 105 75 10
 Polygon -10899396 true false 132 85 134 64 107 51 108 17 150 2 192 18 192 52 169 65 172 87
 Polygon -10899396 true false 85 204 60 233 54 254 72 266 85 252 107 210
 Polygon -7500403 true true 119 75 179 75 209 101 224 135 220 225 175 261 128 261 81 224 74 135 88 99
-
-warning
-false
-0
-Polygon -7500403 true true 0 240 15 270 285 270 300 240 165 15 135 15
-Polygon -16777216 true false 180 75 120 75 135 180 165 180
-Circle -16777216 true false 129 204 42
 
 wheel
 false
